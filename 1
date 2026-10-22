@@ -1,949 +1,542 @@
+--[[
+    ╔══════════════════════════════════════════════════════════════╗
+    ║                     HOLY MOLY! FARM                          ║
+    ║                                                              ║
+    ║   TSB combat automation suite                                ║
+    ║   The Strongest Battlegrounds                                ║
+    ║                                                              ║
+    ║   MADE BY ZED                                                ║
+    ╚══════════════════════════════════════════════════════════════╝
+]]
+
 print("MADE BY ZED")
 
-if getgenv().HOLY_MOLY_UNLOAD then pcall(getgenv().HOLY_MOLY_UNLOAD) end
+if getgenv().HM_ACTIVE then
+    pcall(getgenv().HM_UNLOAD)
+end
 
-local Players = game:GetService("Players")
-local RS = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local VIM = game:GetService("VirtualInputManager")
-local TPS = game:GetService("TeleportService")
-local Stats = game:GetService("Stats")
-local Lighting = game:GetService("Lighting")
-local TweenService = game:GetService("TweenService")
-local LP = Players.LocalPlayer
+--══════════════════════════════════════════════════════ SERVICES ══
 
-local CFG = {
-    Enabled = true,
-    Mode = "LowestHP",
-    Range = 65,
-    Whitelist = {},
-    FriendsWhitelist = true,
-    SafeZoneFilter = true,
-    ImmunityFilter = true,
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
+local UserInput      = game:GetService("UserInputService")
+local VirtualInput   = game:GetService("VirtualInputManager")
+local VirtualUser    = game:GetService("VirtualUser")
+local TweenService   = game:GetService("TweenService")
+local TeleportService= game:GetService("TeleportService")
+local HttpService    = game:GetService("HttpService")
+local Stats          = game:GetService("Stats")
+local Lighting       = game:GetService("Lighting")
+local CoreGui        = game:GetService("CoreGui")
+local Replicated     = game:GetService("ReplicatedStorage")
+local TextChat       = game:GetService("TextChatService")
+local LocalPlayer    = Players.LocalPlayer
 
-    StickMode = "Physics",
-    StickPos = "Behind",
-    StickOffset = 4.5,
-    StickHeight = 1.5,
-    AboveHeight = 6,
+getgenv().HM_ACTIVE = true
+
+--═════════════════════════════════════════════════════════ THEME ══
+
+local Theme = {
+    bg          = Color3.fromRGB(13, 13, 17),
+    bg_alt      = Color3.fromRGB(18, 18, 24),
+    bg_row      = Color3.fromRGB(24, 24, 31),
+    bg_hover    = Color3.fromRGB(36, 30, 44),
+    stroke      = Color3.fromRGB(42, 42, 54),
+    accent      = Color3.fromRGB(255, 105, 200),
+    accent_dim  = Color3.fromRGB(150, 44, 112),
+    accent_2    = Color3.fromRGB(120, 220, 255),
+    text        = Color3.fromRGB(234, 234, 242),
+    text_dim    = Color3.fromRGB(148, 148, 164),
+    text_faint  = Color3.fromRGB(110, 110, 126),
+    good        = Color3.fromRGB(110, 230, 160),
+    warn        = Color3.fromRGB(255, 196, 96),
+    bad         = Color3.fromRGB(255, 118, 118),
+}
+
+local Font = {
+    bold  = Enum.Font.GothamBold,
+    black = Enum.Font.GothamBlack,
+    med   = Enum.Font.GothamMedium,
+    reg   = Enum.Font.Gotham,
+}
+
+--═════════════════════════════════════════════════════════ CONFIG ══
+
+local Config = {
+    -- master
+    Enabled             = true,
+
+    -- targeting
+    Mode                = "LowestHP",
+    Range               = 65,
+    Whitelist           = {},
+    FriendsWhitelist    = true,
+    SafeZoneFilter      = true,
+    ImmunityFilter      = true,
+    PriorityTarget      = nil,
+    LOSCheck            = true,
+
+    -- positioning
+    StickMode           = "Physics",
+    StickPos            = "Behind",
+    StickOffset         = 4.5,
+    StickHeight         = 1.5,
+    AboveHeight         = 6,
     AlignResponsiveness = 150,
-    AlignMaxForce = 100000,
-    AlignMaxVelocity = 0,
-    HardKillVelocity = true,
-    FreezeMove = true,
-    AimPart = "HumanoidRootPart",
+    AlignMaxForce       = 100000,
+    AlignMaxVelocity    = 0,
+    HardKillVelocity    = true,
+    FreezeMove          = true,
+    AimPart             = "HumanoidRootPart",
 
-    Prediction = 1.0,
-    MaxLead = 0.22,
-    Face = true,
-    LockCam = true,
-    AutoWalk = true,
+    -- prediction
+    Prediction          = 1.0,
+    MaxLead             = 0.22,
+    Face                = true,
+    LockCam             = true,
+    AutoWalk            = true,
 
-    AutoCombo = true,
-    AutoM1 = true,
-    M1Delay = 0.10,
-    M1Jitter = 0.35,
-    ComboHits = 3,
-    ComboReset = 0.32,
-    ComboInfinite = false,
-    EndlagCancel = true,
-    EndlagTime = 0.07,
+    -- combat core
+    AutoCombo           = true,
+    AutoM1              = true,
+    M1Delay             = 0.10,
+    M1Jitter            = 0.35,
+    ComboHits           = 3,
+    ComboReset          = 0.32,
+    ComboInfinite       = false,
+    EndlagCancel        = true,
+    EndlagTime          = 0.07,
 
-    Reach = true,
-    ReachMin = 9,
-    ReachMax = 24,
-    ReachTime = 0.12,
-    ReachSnap = 3.2,
+    -- reach
+    Reach               = true,
+    ReachMin            = 9,
+    ReachMax            = 24,
+    ReachTime           = 0.12,
+    ReachSnap           = 3.2,
 
-    AutoSkill = true,
-    SkillKeys = {"E", "R", "T"},
-    SkillDelay = 1.6,
-    GuardBreakOnBlock = true,
+    -- skills
+    AutoSkill           = true,
+    SkillKeys           = {"E", "R", "T"},
+    SkillDelay          = 1.6,
+    SkillFallback       = 3.0,
+    GuardBreakOnBlock   = true,
 
-    ComboFeeder = true,
-    FeederKeys = {"E", "R", "T", "Y"},
-    FeederDelay = 0.09,
-    FeederOnRagdoll = true,
-    FeederOnStun = true,
+    -- feeder
+    ComboFeeder         = true,
+    FeederKeys          = {"E", "R", "T", "Y"},
+    FeederDelay         = 0.09,
+    FeederOnRagdoll     = true,
+    FeederOnStun        = true,
 
-    Awaken = true,
-    AwakenKey = "G",
-    AwakenDelay = 3,
+    -- awakening
+    Awaken              = true,
+    AwakenKey           = "G",
+    AwakenDelay         = 3,
 
-    DashKey = "Q",
-    AutoDash = true,
-    DashRange = 24,
-    DodgeKey = "Q",
-    AutoDodge = true,
-    AutoTech = true,
-    TechKeys = {"A", "D", "S"},
-    BlockKey = "F",
-    AutoBlock = false,
-    AutoCounter = false,
-    CounterKey = "R",
-    CounterRange = 14,
-    CounterCooldown = 0.6,
+    -- defensive
+    DashKey             = "Q",
+    AutoDash            = true,
+    DashRange           = 24,
+    DodgeKey            = "Q",
+    AutoDodge           = true,
+    AutoTech            = true,
+    TechKeys            = {"A", "D", "S"},
+    BlockKey            = "F",
+    AutoBlock           = false,
+    AutoCounter         = false,
+    CounterKey          = "R",
+    CounterRange        = 14,
+    CounterCooldown     = 0.6,
+    AttackWindow        = 0.5,
 
-    AttackWindow = 0.5,
-    LOSCheck = true,
+    -- gimmicks
+    WallCombo           = false,
+    WallDist            = 2.2,
+    WallSize            = 9,
+    HitboxScale         = 1.0,
+    HitboxHold          = 0.25,
+    HitboxSweep         = 5,
 
-    WallCombo = false,
-    WallDist = 2.2,
-    WallSize = 9,
+    -- character
+    AntiRagdoll         = true,
+    AntiStun            = true,
+    AntiFling           = true,
+    AntiVoid            = false,
+    AutoRespawn         = true,
+    AnimSpeed           = 1.2,
+    NoFatigue           = true,
+    JumpPower           = 55,
 
-    HitboxScale = 1.0,
-    HitboxTime = 0.25,
-    HitboxSweep = 3,
+    -- movement
+    WalkSpeed           = 0,
+    InfiniteJump        = false,
+    Noclip              = false,
+    Fly                 = false,
+    FlySpeed            = 90,
+    FlyKey              = "V",
 
-    AntiRagdoll = true,
-    AntiStun = true,
-    AntiFling = true,
-    AutoRespawn = true,
-    AnimSpeed = 1.2,
-    NoFatigue = true,
-    JumpPower = 55,
+    -- visuals
+    VFXCull             = false,
+    CullRate            = 2,
+    LightingCull        = true,
+    ESP                 = false,
+    ESPBox              = true,
+    ESPHealth           = true,
+    ESPName             = true,
+    ESPDistance         = true,
+    ESPTracer           = true,
+    ESPChams            = false,
+    DrawRange           = 400,
+    ReachCircle         = true,
+    Watermark           = true,
 
-    VFXCull = false,
-    CullRate = 2,
-    LightingCull = true,
-    ESP = false,
-    DrawRange = 250,
+    -- networking
+    SilentAim           = false,
+    RemoteLog           = false,
+    RemoteMode          = false,
+    RemoteName          = "",
+    RemoteArg           = "none",
+    RemoteRate          = 0.12,
 
-    SilentAim = false,
-    RemoteLog = false,
-    RemoteMode = false,
-    RemoteName = "",
-    RemoteArg = "none",
-    RemoteRate = 0.12,
+    -- social
+    Toxic               = false,
+    ToxicMsgs           = {"EZ", "ez", "GGEZ", "gg", "skill issue", "too easy"},
+    AutoAFK             = true,
 
-    Toxic = false,
-    ToxicMsgs = {"EZ", "ez", "GGEZ", "gg", "skill issue"},
+    -- staff
+    OnStaff             = "Notify",
+    StaffIds            = {},
+    StaffGroup          = 0,
 
-    OnStaff = "Notify",
-    StaffIds = {},
-    StaffGroup = 0,
-
-    ResetStreakAt = 0,
-    WalkSpeed = 0,
+    -- misc
+    ResetStreakAt       = 0,
+    MenuKey             = "RightShift",
+    SaveConfig          = true,
+    ActiveSlot          = 1,
 }
 
-math.randomseed(os.clock() * 100000)
+local CONFIG_DIR = "HolyMoly"
+local CONFIG_FILE = CONFIG_DIR .. "/slot%d.lua"
 
-local State = {
-    target = nil,
-    tgtPlr = nil,
-    lastM1 = 0,
-    lastSkill = 0,
-    lastAwaken = 0,
-    lastDash = 0,
-    lastDodge = 0,
-    lastWalk = 0,
-    lastCounter = 0,
-    lastFeeder = 0,
-    lastHitTarget = nil,
-    lastHitTime = 0,
-    combo = 0,
-    skillIdx = 0,
-    feederIdx = 0,
-    blocking = false,
-    losOK = true,
-    ragdolled = false,
-    staffNotified = false,
-}
+--═══════════════════════════════════════════════════════════ UTILS ══
 
-local Running = true
-local idleAnims = setmetatable({}, { __mode = "k" })
-local lastTracks = setmetatable({}, { __mode = "k" })
-local attackStart = setmetatable({}, { __mode = "k" })
-local spawnClock = setmetatable({}, { __mode = "k" })
-local friendCache = setmetatable({}, { __mode = "k" })
-local pMaid = setmetatable({}, { __mode = "k" })
-local safeParts = {}
-local align = nil
-local wallPart = nil
+local Utils = {}
 
-local LIMBS = {
-    Head = true, Torso = true, UpperTorso = true, LowerTorso = true, HumanoidRootPart = true,
-    LeftHand = true, RightHand = true, LeftFoot = true, RightFoot = true,
-    LeftLowerArm = true, RightLowerArm = true, LeftUpperArm = true, RightUpperArm = true,
-    LeftLowerLeg = true, RightLowerLeg = true, LeftUpperLeg = true, RightUpperLeg = true,
-}
-
-local HB_PAT = {"hitbox", "hit", "m1", "punch", "attack", "damage", "receiver", "hurt", "impact"}
-
-local Maid = {}
-Maid.__index = Maid
-function Maid.new() return setmetatable({ t = {} }, Maid) end
-function Maid:give(x) self.t[#self.t + 1] = x return x end
-function Maid:clean()
-    for i = #self.t, 1, -1 do
-        local x = self.t[i]
-        pcall(function()
-            local ty = typeof(x)
-            if ty == "RBXScriptConnection" then x:Disconnect()
-            elseif ty == "Instance" then x:Destroy()
-            elseif ty == "thread" then task.cancel(x)
-            elseif ty == "function" then x() end
-        end)
-        self.t[i] = nil
-    end
-end
-
-local M = Maid.new()
-
-local function maidFor(p)
-    local m = pMaid[p]
-    if not m then
-        m = Maid.new()
-        pMaid[p] = m
-    end
-    return m
-end
-
-local function tw(obj, time, props, style, dir)
-    local info = TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out)
-    local t = TweenService:Create(obj, info, props)
-    t:Play()
-    return t
-end
-
-local function myChar() return LP.Character end
-local function myHRP()
-    local c = LP.Character
-    return c and c:FindFirstChild("HumanoidRootPart")
-end
-local function myHum()
-    local c = LP.Character
-    return c and c:FindFirstChildOfClass("Humanoid")
-end
-local function humOf(c) return c and c:FindFirstChildOfClass("Humanoid") end
-local function hrpOf(c) return c and c:FindFirstChild("HumanoidRootPart") end
-
-local function ping()
-    local ok, p = pcall(function() return LP:GetNetworkPing() end)
-    if ok and p then return p * 1000 end
-    local ok2, v = pcall(function() return Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
-    if ok2 and v then return v end
-    return 60
-end
-
-local function attrBool(inst, names)
-    for _, n in ipairs(names) do
-        local v = inst:GetAttribute(n)
-        if v ~= nil then return v == true end
-    end
-    for _, n in ipairs(names) do
-        local f = inst:FindFirstChild(n)
-        if f then
-            if f:IsA("BoolValue") then return f.Value end
-            return true
-        end
-    end
-    return false
-end
-
-local ATK_ATTR = {"Attacking", "InCombo", "IsAttacking", "UsingMove", "Dashing", "MoveActive"}
-
-local function isBlocking(char) return attrBool(char, {"Blocking", "Block", "IsBlocking", "Guarding", "Blocked"}) end
-
-local function isRagdolled(char, hum)
-    if attrBool(char, {"Ragdoll", "Ragdolled", "IsRagdoll", "Stunned", "Stun"}) then return true end
-    if hum and hum.PlatformStand then return true end
-    if hum and hum:GetState() == Enum.HumanoidStateType.Physics then return true end
-    return false
-end
-
-local function isStunned(char) return attrBool(char, {"Stunned", "Stun", "Staggered", "HitStun"}) end
-
-local function isAttacking(p, char)
-    if attrBool(char, ATK_ATTR) then return true end
-    local t0 = attackStart[p]
-    if t0 and (os.clock() - t0) <= CFG.AttackWindow then return true end
-    return false
-end
-
-local function isFriend(p)
-    local v = friendCache[p]
-    if v == nil then
-        local ok, r = pcall(function() return LP:IsFriendsWith(p.UserId) end)
-        v = ok and r or false
-        friendCache[p] = v
-    end
+function Utils.clamp(v, lo, hi)
+    if v < lo then return lo end
+    if v > hi then return hi end
     return v
 end
 
-local function isWhitelisted(p)
-    if CFG.Whitelist[p.Name] or CFG.Whitelist[p.UserId] then return true end
-    if CFG.FriendsWhitelist and isFriend(p) then return true end
-    return false
+function Utils.round(v, decimals)
+    local mult = 10 ^ (decimals or 0)
+    return math.floor(v * mult + 0.5) / mult
 end
 
-local function refreshSafe()
-    table.clear(safeParts)
-    for _, d in ipairs(workspace:GetChildren()) do
-        if d:IsA("BasePart") then
-            local n = d.Name:lower()
-            if n:find("safe") or n:find("spawn") or n:find("lobby") then
-                safeParts[#safeParts + 1] = d
-            end
-        end
-    end
-    local sp = workspace:FindFirstChildOfClass("SpawnLocation")
-    if sp then safeParts[#safeParts + 1] = sp end
+function Utils.tween(instance, duration, props, style, direction)
+    local info = TweenInfo.new(
+        duration,
+        style or Enum.EasingStyle.Quad,
+        direction or Enum.EasingDirection.Out
+    )
+    local tween = TweenService:Create(instance, info, props)
+    tween:Play()
+    return tween
 end
 
-local function inSafe(pos)
-    for _, p in ipairs(safeParts) do
-        local r = math.max(p.Size.Magnitude * 0.5, 38)
-        if (p.Position - pos).Magnitude <= r then return true end
-    end
-    return false
-end
-
-local function isImmune(p, hum, char)
-    if attrBool(char, {"Invulnerable", "Immune", "SpawnProtection", "IFrames", "SpawnImmunity"}) then return true end
-    local t0 = spawnClock[p]
-    if t0 and (os.clock() - t0) < 2.5 and hum.Health >= hum.MaxHealth then return true end
-    return false
-end
-
-local function snapshotIdles(p)
-    local c = p.Character
-    local h = humOf(c)
-    if not h then return end
-    local set = {}
-    for _, tr in ipairs(h:GetPlayingAnimationTracks()) do
-        if tr.Animation then set[tr.Animation.AnimationId] = true end
-    end
-    idleAnims[p] = set
-    lastTracks[p] = {}
-end
-
-local function nonIdleTracks(h, p)
-    local set = {}
-    local idle = idleAnims[p]
-    for _, tr in ipairs(h:GetPlayingAnimationTracks()) do
-        local id = tr.Animation and tr.Animation.AnimationId
-        if id and not (idle and idle[id]) then set[id] = true end
-    end
-    return set
-end
-
-local VFX_NAME = {"vfx", "effect", "hit", "slash", "impact", "smear", "aura", "spark", "flash", "wave"}
-
-local function say(msg)
-    pcall(function()
-        local tc = game:GetService("TextChatService")
-        local ch = tc and tc.TextChannels and tc.TextChannels:FindFirstChild("RBXGeneral")
-        if ch then
-            ch:SendAsync(msg)
-            return
-        end
+function Utils.ping()
+    local ok, value = pcall(function()
+        return LocalPlayer:GetNetworkPing()
     end)
-    pcall(function()
-        RS.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
+    if ok and value then
+        return value * 1000
+    end
+    local ok2, value2 = pcall(function()
+        return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
     end)
-end
-
-local function watchChar(p, c)
-    if not c then return end
-    local m = maidFor(p)
-    m:give(c.ChildAdded:Connect(function(ch)
-        local n = ch.Name:lower()
-        for _, k in ipairs(VFX_NAME) do
-            if n:find(k) then
-                attackStart[p] = os.clock()
-                return
-            end
-        end
-    end))
-    local h = humOf(c)
-    if h then
-        m:give(h.Died:Connect(function()
-            if State.lastHitTarget == p and (os.clock() - State.lastHitTime) < 4 then
-                State.combo = 0
-                if CFG.Toxic then say(CFG.ToxicMsgs[math.random(#CFG.ToxicMsgs)]) end
-            end
-        end))
+    if ok2 and value2 then
+        return value2
     end
+    return 60
 end
 
-local ultFrame = nil
-local function findUlt()
-    local pg = LP:FindFirstChildOfClass("PlayerGui")
-    if not pg then return end
-    for _, d in ipairs(pg:GetDescendants()) do
-        if d:IsA("Frame") then
-            local n = d.Name:lower()
-            if n:find("awaken") or n:find("ult") or n:find("rage") or n:find("power") or n:find("energy") then
-                ultFrame = d
-                return
-            end
+function Utils.fps()
+    return math.floor(1 / math.max(RunService.RenderStepped:Wait(), 0.0001))
+end
+
+function Utils.attrBool(instance, names)
+    for _, name in ipairs(names) do
+        local value = instance:GetAttribute(name)
+        if value ~= nil then
+            return value == true
         end
     end
-end
-
-local function ultReady()
-    for _, n in ipairs({"Awakening", "Ult", "Ultimate", "Rage", "AwakenValue", "Power", "Energy"}) do
-        local v = LP:GetAttribute(n)
-        if v == nil and LP.Character then v = LP.Character:GetAttribute(n) end
-        if typeof(v) == "number" then
-            if v >= 100 or (v >= 0.99 and v <= 1.01) then return true end
-        elseif v == true then
+    for _, name in ipairs(names) do
+        local child = instance:FindFirstChild(name)
+        if child then
+            if child:IsA("BoolValue") then
+                return child.Value
+            end
             return true
         end
     end
-    if not ultFrame or not ultFrame.Parent then ultFrame = nil findUlt() end
-    if not ultFrame then return false end
-    if ultFrame:IsA("Frame") and ultFrame.Size.X.Scale >= 0.97 then return true end
-    for _, c in ipairs(ultFrame:GetDescendants()) do
-        if c:IsA("Frame") and c.Size.X.Scale >= 0.97 then return true end
-    end
     return false
 end
 
-local function aimPoint(t)
-    if CFG.AimPart ~= "" then
-        local p = t.char:FindFirstChild(CFG.AimPart)
-        if p and p:IsA("BasePart") then return p end
+function Utils.new(class, props, parent)
+    local instance = Instance.new(class)
+    for key, value in pairs(props or {}) do
+        instance[key] = value
     end
-    return t.hrp
+    if parent then
+        instance.Parent = parent
+    end
+    return instance
 end
 
-local function pick()
-    local myR = myHRP()
-    if not myR then return nil end
-    local myPos = myR.Position
-    local best, bestKey
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP and not isWhitelisted(p) then
-            local c = p.Character
-            if c then
-                local h = humOf(c)
-                local r = hrpOf(c)
-                if h and r and h.Health > 0 then
-                    local ok = true
-                    if CFG.SafeZoneFilter and inSafe(r.Position) then ok = false end
-                    if ok and CFG.ImmunityFilter and isImmune(p, h, c) then ok = false end
-                    if ok then
-                        local d = (r.Position - myPos).Magnitude
-                        if d <= CFG.Range then
-                            local key
-                            if CFG.Mode == "Nearest" then key = d
-                            elseif CFG.Mode == "Farthest" then key = -d
-                            else key = h.Health end
-                            if not bestKey or key < bestKey then
-                                bestKey = key
-                                best = { plr = p, char = c, hum = h, hrp = r, dist = d }
-                            end
-                        end
-                    end
-                end
+function Utils.corner(instance, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 6)
+    corner.Parent = instance
+    return corner
+end
+
+function Utils.stroke(instance, color, thickness, transparency)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color or Theme.stroke
+    stroke.Thickness = thickness or 1
+    stroke.Transparency = transparency or 0.4
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = instance
+    return stroke
+end
+
+function Utils.pad(instance, top, right, bottom, left)
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0, top or 0)
+    padding.PaddingRight = UDim.new(0, right or 0)
+    padding.PaddingBottom = UDim.new(0, bottom or 0)
+    padding.PaddingLeft = UDim.new(0, left or 0)
+    padding.Parent = instance
+    return padding
+end
+
+function Utils.serialize(value, depth)
+    depth = depth or 0
+    local kind = type(value)
+
+    if kind == "number" or kind == "boolean" then
+        return tostring(value)
+    end
+    if kind == "string" then
+        return string.format("%q", value)
+    end
+    if kind == "table" and depth < 4 then
+        local parts = {}
+        for key, entry in pairs(value) do
+            local keyText
+            if type(key) == "string" then
+                keyText = string.format("[%q]", key)
+            else
+                keyText = "[" .. tostring(key) .. "]"
+            end
+            parts[#parts + 1] = keyText .. "=" .. Utils.serialize(entry, depth + 1)
+        end
+        return "{" .. table.concat(parts, ",") .. "}"
+    end
+    return "nil"
+end
+
+function Utils.safeWrite(path, contents)
+    if not writefile then return false end
+    local ok = pcall(function()
+        if makefolder and isfolder then
+            local folder = path:match("^([^/]+)/")
+            if folder and not isfolder(folder) then
+                makefolder(folder)
             end
         end
-    end
-    return best
-end
-
-local losParams
-local function hasLOS(t)
-    local myR = myHRP()
-    if not myR then return true end
-    if not losParams then
-        losParams = RaycastParams.new()
-        losParams.FilterType = Enum.RaycastFilterType.Exclude
-        losParams.IgnoreWater = true
-    end
-    losParams.FilterDescendantsInstances = { LP.Character, t.char, wallPart }
-    local hit = workspace:Raycast(myR.Position, t.hrp.Position - myR.Position, losParams)
-    return hit == nil
-end
-
-local function leadTime()
-    if CFG.Prediction <= 0 then return 0 end
-    return math.clamp(ping() / 1000, 0.02, CFG.MaxLead) * CFG.Prediction
-end
-
-local function predictPos(r)
-    return r.Position + r.AssemblyLinearVelocity * leadTime()
-end
-
-local hasM1 = (type(mouse1click) == "function")
-
-local function click()
-    if hasM1 then
-        pcall(mouse1click)
-    else
-        pcall(function() VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1) end)
-        task.delay(0.03, function()
-            pcall(function() VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1) end)
-        end)
-    end
-end
-
-local function keyDown(k)
-    local kc = Enum.KeyCode[tostring(k):upper()]
-    if kc then pcall(function() VIM:SendKeyEvent(true, kc, false, game) end) end
-end
-
-local function keyUp(k)
-    local kc = Enum.KeyCode[tostring(k):upper()]
-    if kc then pcall(function() VIM:SendKeyEvent(false, kc, false, game) end) end
-end
-
-local function key(k, hold)
-    hold = hold or 0.05
-    keyDown(k)
-    task.delay(hold, function() keyUp(k) end)
-end
-
-local function dashDir(dir)
-    if dir then keyDown(dir) end
-    key(CFG.DashKey)
-    if dir then task.delay(0.12, function() keyUp(dir) end) end
-end
-
-local function destroyAlign()
-    if not align then return end
-    pcall(function() align.ap:Destroy() end)
-    pcall(function() align.ao:Destroy() end)
-    pcall(function() align.att:Destroy() end)
-    align = nil
-end
-
-local function ensureAlign()
-    local r = myHRP()
-    if not r then return end
-    if align and align.hrp == r and align.att.Parent then return end
-    destroyAlign()
-    local att = Instance.new("Attachment")
-    att.Name = "HolyMolyAtt"
-    att.Parent = r
-    local ap = Instance.new("AlignPosition")
-    ap.Mode = Enum.PositionAlignmentMode.OneAttachment
-    ap.Attachment0 = att
-    ap.ApplyAtCenterOfMass = true
-    ap.RigidityEnabled = false
-    ap.MaxForce = CFG.AlignMaxForce
-    ap.Responsiveness = CFG.AlignResponsiveness
-    if CFG.AlignMaxVelocity > 0 then ap.MaxVelocity = CFG.AlignMaxVelocity end
-    ap.Parent = r
-    local ao = Instance.new("AlignOrientation")
-    ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    ao.Attachment0 = att
-    ao.RigidityEnabled = false
-    ao.MaxTorque = CFG.AlignMaxForce
-    ao.Responsiveness = CFG.AlignResponsiveness
-    ao.Parent = r
-    align = { hrp = r, att = att, ap = ap, ao = ao }
-end
-
-local function stickGoal(t)
-    local ap = aimPoint(t)
-    local tp = predictPos(ap)
-    local pos
-    if CFG.StickPos == "Behind" then
-        pos = tp - ap.CFrame.LookVector * CFG.StickOffset + Vector3.new(0, CFG.StickHeight, 0)
-    elseif CFG.StickPos == "Front" then
-        pos = tp + ap.CFrame.LookVector * CFG.StickOffset + Vector3.new(0, CFG.StickHeight, 0)
-    else
-        pos = tp + Vector3.new(0, CFG.AboveHeight, 0)
-    end
-    return pos, tp
-end
-
-local function applyStick(t)
-    local myR = myHRP()
-    if not myR then return end
-    local h = myHum()
-
-    if h and CFG.FreezeMove and CFG.StickMode == "Physics" then
-        pcall(function() h:Move(Vector3.zero, false) end)
-    end
-    if h then h.AutoRotate = false end
-
-    if CFG.StickMode == "None" then
-        destroyAlign()
-        if CFG.Face then
-            local flat = t.hrp.Position - myR.Position
-            flat = Vector3.new(flat.X, 0, flat.Z)
-            if flat.Magnitude > 0.4 then
-                myR.CFrame = CFrame.lookAt(myR.Position, myR.Position + flat)
-            end
-        end
-        return
-    end
-
-    local pos, tp = stickGoal(t)
-
-    if CFG.StickMode == "Physics" then
-        ensureAlign()
-        if align then
-            align.ap.Position = pos
-            align.ao.CFrame = CFrame.lookAt(myR.Position, tp)
-        end
-    else
-        destroyAlign()
-        myR.CFrame = CFrame.lookAt(pos, tp)
-        if CFG.HardKillVelocity then myR.AssemblyLinearVelocity = Vector3.zero end
-    end
-end
-
-local function applyReach(t)
-    local myR = myHRP()
-    if not myR then return end
-    local d = t.dist
-    if d < CFG.ReachMin or d > CFG.ReachMax then return end
-    if CFG.StickMode == "Physics" and align then
-        align.ap.MaxVelocity = math.huge
-        align.ap.Responsiveness = 400
-        task.delay(CFG.ReachTime, function()
-            if align and align.ap.Parent then
-                align.ap.MaxVelocity = (CFG.AlignMaxVelocity > 0) and CFG.AlignMaxVelocity or math.huge
-                align.ap.Responsiveness = CFG.AlignResponsiveness
-            end
-        end)
-    else
-        local ap = aimPoint(t)
-        local dir = ap.Position - myR.Position
-        dir = Vector3.new(dir.X, 0, dir.Z)
-        if dir.Magnitude < 0.5 then return end
-        local pos = ap.Position - dir.Unit * CFG.ReachSnap + Vector3.new(0, 1.5, 0)
-        myR.CFrame = CFrame.lookAt(pos, ap.Position)
-    end
-end
-
-local function endlagCancel()
-    if not CFG.EndlagCancel then return end
-    task.delay(CFG.EndlagTime, function()
-        local h = myHum()
-        if not h or h.PlatformStand then return end
-        local st = h:GetState()
-        if st == Enum.HumanoidStateType.Running
-            or st == Enum.HumanoidStateType.Freefall
-            or st == Enum.HumanoidStateType.Landed then
-            pcall(function() h:ChangeState(Enum.HumanoidStateType.Running) end)
-        end
+        writefile(path, contents)
     end)
+    return ok
 end
 
-local function destroyWall()
-    if wallPart then
-        pcall(function() wallPart:Destroy() end)
-        wallPart = nil
-    end
-end
-
-local function ensureWall()
-    if wallPart and wallPart.Parent then return wallPart end
-    wallPart = Instance.new("Part")
-    wallPart.Name = "HolyMolyWall"
-    wallPart.Anchored = true
-    wallPart.CanCollide = false
-    wallPart.CanQuery = true
-    wallPart.CanTouch = true
-    wallPart.Massless = true
-    wallPart.CastShadow = false
-    wallPart.Material = Enum.Material.SmoothPlastic
-    wallPart.Transparency = 1
-    wallPart.Size = Vector3.new(CFG.WallSize, CFG.WallSize, 1)
-    wallPart.Parent = workspace
-    return wallPart
-end
-
-local function updateWall(t)
-    if not CFG.WallCombo or CFG.StickMode == "None" then
-        destroyWall()
-        return
-    end
-    local myR = myHRP()
-    if not myR then return end
-    local dir = t.hrp.Position - myR.Position
-    dir = Vector3.new(dir.X, 0, dir.Z)
-    if dir.Magnitude < 0.5 then return end
-    local w = ensureWall()
-    w.Size = Vector3.new(CFG.WallSize, CFG.WallSize, 1)
-    w.CFrame = CFrame.lookAt(t.hrp.Position + dir.Unit * CFG.WallDist, myR.Position)
-end
-
-local function isHitboxName(n)
-    n = n:lower()
-    for _, k in ipairs(HB_PAT) do
-        if n:find(k) then return true end
-    end
-    return false
-end
-
-local function expandHitbox(d)
-    if CFG.HitboxScale == 1 then return end
-    if not d:IsA("BasePart") then return end
-    if LIMBS[d.Name] then return end
-    if not isHitboxName(d.Name) then return end
-    local base = d:GetAttribute("HolyHBBase")
-    if not base or (base * CFG.HitboxScale - d.Size).Magnitude > 0.35 then
-        base = d.Size
-        pcall(function() d:SetAttribute("HolyHBBase", base) end)
-    end
-    d.Size = base * CFG.HitboxScale
-end
-
-local function armHitbox(d)
-    expandHitbox(d)
-    task.spawn(function()
-        local t0 = os.clock()
-        while os.clock() - t0 < CFG.HitboxTime do
-            task.wait(0.03)
-            if not d.Parent then break end
-            expandHitbox(d)
-        end
+function Utils.safeRead(path)
+    if not (readfile and isfile) then return nil end
+    local ok, contents = pcall(function()
+        if not isfile(path) then return nil end
+        return readfile(path)
     end)
-end
-
-local function animSpeed()
-    local h = myHum()
-    if not h then return end
-    local idle = idleAnims[LP]
-    for _, tr in ipairs(h:GetPlayingAnimationTracks()) do
-        local id = tr.Animation and tr.Animation.AnimationId
-        if id and not (idle and idle[id]) then
-            if tr.Speed ~= CFG.AnimSpeed then tr.Speed = CFG.AnimSpeed end
-        end
-    end
-end
-
-local function combatM1(t)
-    local now = os.clock()
-    if now - State.lastM1 > CFG.ComboReset then State.combo = 0 end
-    if not CFG.ComboInfinite and State.combo >= CFG.ComboHits then return end
-    local jit = 1 + (math.random() - 0.5) * CFG.M1Jitter
-    if now - State.lastM1 >= CFG.M1Delay * jit then
-        State.lastM1 = now
-        State.combo = State.combo + 1
-        if CFG.Reach then pcall(applyReach, t) end
-        click()
-        State.lastHitTarget = t.plr
-        State.lastHitTime = now
-        endlagCancel()
-    end
-end
-
-local function feeder(t)
-    if not CFG.ComboFeeder then return end
-    local now = os.clock()
-    if now - State.lastFeeder < CFG.FeederDelay then return end
-    local rag = isRagdolled(t.char, t.hum)
-    local stun = isStunned(t.char)
-    if (rag and CFG.FeederOnRagdoll) or (stun and CFG.FeederOnStun) then
-        State.feederIdx = (State.feederIdx % #CFG.FeederKeys) + 1
-        State.lastFeeder = now
-        key(CFG.FeederKeys[State.feederIdx])
-    end
-end
-
-local function brain(t)
-    local now = os.clock()
-    if t.plr ~= State.tgtPlr then
-        State.tgtPlr = t.plr
-        State.combo = 0
-    end
-
-    if CFG.AutoWalk and CFG.StickMode == "None" and t.dist > 12 and now - State.lastWalk > 0.25 then
-        State.lastWalk = now
-        local h = myHum()
-        if h then pcall(function() h:MoveTo(t.hrp.Position) end) end
-    end
-
-    if not CFG.AutoCombo then return end
-
-    local blocking = isBlocking(t.char)
-    local rag = isRagdolled(t.char, t.hum)
-    local atk = isAttacking(t.plr, t.char)
-
-    if CFG.AutoDash and not rag and t.dist > CFG.DashRange and now - State.lastDash > 0.6 then
-        State.lastDash = now
-        if CFG.AutoTech and CFG.StickMode ~= "None" then
-            dashDir(CFG.TechKeys[math.random(#CFG.TechKeys)])
-        else
-            key(CFG.DashKey)
-        end
-    end
-
-    if CFG.AutoDodge and t.dist < 20 and not rag and atk and now - State.lastDodge > 0.4 then
-        State.lastDodge = now
-        if CFG.AutoTech then
-            dashDir(CFG.TechKeys[math.random(#CFG.TechKeys)])
-        else
-            key(CFG.DodgeKey)
-        end
-    end
-
-    if CFG.AutoCounter and t.dist < CFG.CounterRange and atk and now - State.lastCounter > CFG.CounterCooldown then
-        State.lastCounter = now
-        key(CFG.CounterKey)
-    end
-
-    if CFG.AutoBlock and t.dist < 16 and atk and not State.blocking then
-        State.blocking = true
-        local kc = Enum.KeyCode[CFG.BlockKey:upper()]
-        if kc then
-            pcall(function() VIM:SendKeyEvent(true, kc, false, game) end)
-            task.delay(0.35, function()
-                pcall(function() VIM:SendKeyEvent(false, kc, false, game) end)
-                State.blocking = false
-            end)
-        else
-            State.blocking = false
-        end
-    end
-
-    if CFG.ComboFeeder then
-        feeder(t)
-    elseif CFG.AutoSkill and now - State.lastSkill > CFG.SkillDelay then
-        if (not blocking) or CFG.GuardBreakOnBlock then
-            State.skillIdx = (State.skillIdx % #CFG.SkillKeys) + 1
-            State.lastSkill = now
-            key(CFG.SkillKeys[State.skillIdx])
-        end
-    end
-
-    if CFG.Awaken and now - State.lastAwaken > CFG.AwakenDelay and ultReady() then
-        State.lastAwaken = now
-        key(CFG.AwakenKey)
-    end
-
-    if CFG.AutoM1 and (State.losOK or not CFG.LOSCheck) then
-        combatM1(t)
-    end
-end
-
-local remoteCache = nil
-local function findRemote()
-    if remoteCache and remoteCache.Parent then return remoteCache end
-    remoteCache = nil
-    if CFG.RemoteName == "" then return nil end
-    for _, d in ipairs(RS:GetDescendants()) do
-        if (d:IsA("RemoteEvent") or d:IsA("UnreliableRemoteEvent")) and d.Name == CFG.RemoteName then
-            remoteCache = d
-            return d
-        end
-    end
+    if ok then return contents end
     return nil
 end
 
-local function fireRemote()
-    local r = findRemote()
-    local t = State.target
-    if not r or not t then return end
-    if CFG.RemoteArg == "player" then
-        pcall(function() r:FireServer(t.plr) end)
-    elseif CFG.RemoteArg == "char" then
-        pcall(function() r:FireServer(t.char) end)
-    elseif CFG.RemoteArg == "hrp" then
-        pcall(function() r:FireServer(t.hrp) end)
-    elseif CFG.RemoteArg == "pos" then
-        pcall(function() r:FireServer(t.hrp.Position) end)
-    else
-        pcall(function() r:FireServer() end)
+--══════════════════════════════════════════════════════════ SIGNAL ══
+
+local Signal = {}
+Signal.__index = Signal
+
+function Signal.new()
+    return setmetatable({ _handlers = {} }, Signal)
+end
+
+function Signal:Connect(fn)
+    self._handlers[#self._handlers + 1] = fn
+    local connection = {}
+    connection.__index = connection
+    connection.Connected = true
+    connection.Disconnect = function()
+        connection.Connected = false
+        for index, handler in ipairs(self._handlers) do
+            if handler == fn then
+                table.remove(self._handlers, index)
+                break
+            end
+        end
+    end
+    return connection
+end
+
+function Signal:Fire(...)
+    for _, handler in ipairs(self._handlers) do
+        local ok, err = pcall(handler, ...)
+        if not ok then
+            warn("[HM] signal error: " .. tostring(err))
+        end
     end
 end
 
-local origNamecall
-local hookOK = pcall(function()
-    local mt = getrawmetatable(game)
-    origNamecall = mt.__namecall
-    setreadonly(mt, false)
-    mt.__namecall = function(self, ...)
-        local m = getnamecallmethod()
-        if m == "FireServer" or m == "InvokeServer" then
-            if CFG.RemoteLog and typeof(self) == "Instance" then
-                print("[HOLY MOLY] " .. m .. " -> " .. self:GetFullName(), ...)
-            end
-        elseif m == "Raycast" and CFG.SilentAim and self == workspace and State.target then
-            local a1, a2, a3 = ...
-            if typeof(a1) == "Vector3" then
-                local myR = myHRP()
-                if myR and (a1 - myR.Position).Magnitude < 20 then
-                    return origNamecall(self, a1, aimPoint(State.target).Position - a1, a3)
-                end
-            end
-        end
-        return origNamecall(self, ...)
-    end
-    setreadonly(mt, true)
-end)
+--══════════════════════════════════════════════════════════════ MAID ══
 
-local function watch(p)
-    spawnClock[p] = 0
-    friendCache[p] = nil
-    p:GetPropertyChangedSignal("Character"):Connect(function() end)
-    M:give(p.CharacterAdded:Connect(function(c)
-        spawnClock[p] = os.clock()
-        maidFor(p):clean()
-        watchChar(p, c)
-        task.delay(2, function()
-            if Running then snapshotIdles(p) end
+local Maid = {}
+Maid.__index = Maid
+
+function Maid.new()
+    return setmetatable({ _items = {} }, Maid)
+end
+
+function Maid:Give(item)
+    self._items[#self._items + 1] = item
+    return item
+end
+
+function Maid:Clean()
+    for index = #self._items, 1, -1 do
+        local item = self._items[index]
+        pcall(function()
+            local kind = typeof(item)
+            if kind == "RBXScriptConnection" then
+                item:Disconnect()
+            elseif kind == "Instance" then
+                item:Destroy()
+            elseif kind == "thread" then
+                task.cancel(item)
+            elseif kind == "function" then
+                item()
+            elseif kind == "table" and item.Destroy then
+                item:Destroy()
+            end
         end)
-    end))
-    if p.Character then watchChar(p, p.Character) end
-    task.spawn(function()
-        task.wait(2)
-        snapshotIdles(p)
-    end)
+        self._items[index] = nil
+    end
 end
 
-for _, p in ipairs(Players:GetPlayers()) do watch(p) end
+local RootMaid = Maid.new()
+local PlayerMaids = setmetatable({}, { __mode = "k" })
 
-M:give(Players.PlayerAdded:Connect(function(p)
-    watch(p)
-    task.wait(3)
-    if not Running then return end
-    local staff = CFG.StaffIds[p.UserId] or CFG.StaffIds[p.Name]
-    if not staff and CFG.StaffGroup > 0 then
-        local ok, rank = pcall(function() return p:GetRankInGroup(CFG.StaffGroup) end)
-        if ok and rank and rank >= 1 then staff = true end
+local function maidFor(player)
+    local maid = PlayerMaids[player]
+    if not maid then
+        maid = Maid.new()
+        PlayerMaids[player] = maid
     end
-    if staff then
-        State.staffNotified = true
-        if CFG.OnStaff == "Shutdown" then
-            pcall(function() game:Shutdown() end)
-        elseif CFG.OnStaff == "Hop" then
-            pcall(function() TPS:Teleport(game.PlaceId, LP) end)
-        else
-            print("[HOLY MOLY] STAFF DETECTED: " .. p.Name)
-        end
-    else
-        task.wait(4)
-        if Running and not p.Character and not State.staffNotified then
-            print("[HOLY MOLY] possible spectator: " .. p.Name)
-        end
-    end
-end))
+    return maid
+end
 
-M:give(Players.PlayerRemoving:Connect(function(p)
-    friendCache[p] = nil
-    idleAnims[p] = nil
-    lastTracks[p] = nil
-    attackStart[p] = nil
-    spawnClock[p] = nil
-    if pMaid[p] then
-        pMaid[p]:clean()
-        pMaid[p] = nil
-    end
-end))
+--═════════════════════════════════════════════════════════ RUNTIME ══
 
-M:give(LP.CharacterAdded:Connect(function(c)
-    spawnClock[LP] = os.clock()
-    destroyAlign()
-    watchChar(LP, c)
-    task.wait(0.6)
-    local h = humOf(c)
-    if h then h.AutoRotate = true end
-    task.wait(1.4)
-    snapshotIdles(LP)
-end))
+local Runtime = {
+    Running = true,
+    Version = "9.0",
+    HookInstalled = false,
+    Started = os.clock(),
+}
 
-local VFX = {
+local State = {
+    Target = nil,
+    TargetPlayer = nil,
+    Combo = 0,
+    SkillIndex = 0,
+    FeederIndex = 0,
+    Blocking = false,
+    LosClear = true,
+    Ragdolled = false,
+    Flying = false,
+    StaffSeen = false,
+    LastM1 = 0,
+    LastSkill = 0,
+    LastSkillAny = 0,
+    LastAwaken = 0,
+    LastDash = 0,
+    LastDodge = 0,
+    LastWalk = 0,
+    LastCounter = 0,
+    LastFeeder = 0,
+    LastJump = 0,
+    LastHitPlayer = nil,
+    LastHitAt = 0,
+    LastSafeRefresh = 0,
+}
+
+local IdleIds      = setmetatable({}, { __mode = "k" })
+local AnimSeen     = setmetatable({}, { __mode = "k" })
+local AttackAt     = setmetatable({}, { __mode = "k" })
+local SpawnAt      = setmetatable({}, { __mode = "k" })
+local FriendCache  = setmetatable({}, { __mode = "k" })
+local ChamCache    = setmetatable({}, { __mode = "k" })
+
+local SafeParts = {}
+local AlignRig = nil
+local WallPart = nil
+local LosParams = nil
+local FlyBody = nil
+local NoclipSaved = {}
+local ReachCircle = nil
+
+--════════════════════════════════════════════════════════ CONSTANTS ══
+
+local ATK_ATTR   = {"Attacking", "InCombo", "IsAttacking", "UsingMove", "Dashing", "MoveActive"}
+local BLOCK_ATTR = {"Blocking", "Block", "IsBlocking", "Guarding", "Blocked"}
+local STUN_ATTR  = {"Stunned", "Stun", "Staggered", "HitStun"}
+local RAG_ATTR   = {"Ragdoll", "Ragdolled", "IsRagdoll", "Stunned", "Stun"}
+local IMMUNE_ATTR= {"Invulnerable", "Immune", "SpawnProtection", "IFrames", "SpawnImmunity"}
+
+local IDLE_NAMES = {
+    idle = true, idle1 = true, idle2 = true, idle3 = true,
+    walk = true, walking = true, run = true, running = true,
+    jump = true, jumping = true, fall = true, falling = true,
+    freefall = true, land = true, landing = true,
+    climb = true, swimming = true, swim = true,
+    sit = true, toolnone = true, animation = true,
+}
+
+local IDLE_HINTS = {"idle", "walk", "run", "jump", "fall", "land", "climb", "swim", "toolnone"}
+
+local HB_HINTS = {
+    "hitbox", "hit", "m1", "punch", "attack",
+    "damage", "receiver", "hurt", "impact", "melee",
+}
+
+local LIMB_NAMES = {
+    Head = true, Torso = true, UpperTorso = true, LowerTorso = true,
+    HumanoidRootPart = true, LeftHand = true, RightHand = true,
+    LeftFoot = true, RightFoot = true, LeftLowerArm = true,
+    RightLowerArm = true, LeftUpperArm = true, RightUpperArm = true,
+    LeftLowerLeg = true, RightLowerLeg = true,
+    LeftUpperLeg = true, RightUpperLeg = true,
+}
+
+local VFX_CLASSES = {
     ParticleEmitter = true,
     Trail = true,
     Beam = true,
@@ -952,795 +545,3818 @@ local VFX = {
     Sparkles = true,
 }
 
-local LIGHT_EFFECTS = {
+local LIGHT_CLASSES = {
     BlurEffect = true,
     BloomEffect = true,
     SunRaysEffect = true,
     DepthOfFieldEffect = true,
 }
 
-local function applyLightingCull()
-    if not CFG.LightingCull then return end
-    for _, d in ipairs(Lighting:GetChildren()) do
-        if LIGHT_EFFECTS[d.ClassName] and d.Enabled then d.Enabled = false end
-    end
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd = 500
+local VFX_NAME_HINTS = {
+    "vfx", "effect", "hit", "slash", "impact",
+    "smear", "aura", "spark", "flash", "wave",
+}
+
+--═════════════════════════════════════════════════════════════ ENTITY ══
+
+local Entity = {}
+
+function Entity.Character()
+    return LocalPlayer.Character
 end
 
-refreshSafe()
-task.spawn(function()
-    while Running do
-        task.wait(3)
-        refreshSafe()
-    end
-end)
-
-M:give(workspace.DescendantAdded:Connect(function(d)
-    if d:IsA("BasePart") and CFG.HitboxScale ~= 1 and isHitboxName(d.Name) then
-        pcall(armHitbox, d)
-    end
-    if CFG.VFXCull then
-        if VFX[d.ClassName] then d.Enabled = false end
-        if d:IsA("Explosion") then d.Visible = false end
-    end
-end))
-
-task.spawn(function()
-    while Running do
-        task.wait(CFG.HitboxSweep)
-        if CFG.HitboxScale ~= 1 then
-            for _, d in ipairs(workspace:GetChildren()) do
-                if d:IsA("BasePart") then pcall(expandHitbox, d) end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while Running do
-        task.wait(0.03)
-        local myR = myHRP()
-        if myR then
-            local myPos = myR.Position
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP then
-                    local c = p.Character
-                    local h = humOf(c)
-                    local r = hrpOf(c)
-                    if h and r and (r.Position - myPos).Magnitude <= CFG.Range * 1.5 then
-                        local set = nonIdleTracks(h, p)
-                        local prev = lastTracks[p] or {}
-                        local currentSet = {}
-                        for id in pairs(set) do
-                            currentSet[id] = true
-                            if not prev[id] then
-                                attackStart[p] = os.clock()
-                            end
-                        end
-                        lastTracks[p] = currentSet
-                    end
-                end
-            end
-        end
-    end
-end)
-
-M:give(RunService.Heartbeat:Connect(function()
-    if not Running then return end
-    if not CFG.Enabled then
-        destroyAlign()
-        destroyWall()
-        return
-    end
-
-    local myC = myChar()
-    local myH = myHum()
-    local rag = (myC and myH and isRagdolled(myC, myH)) and true or false
-    State.ragdolled = rag
-
-    if align then
-        align.ap.Enabled = not rag
-        align.ao.Enabled = not rag
-    end
-
-    local t = State.target
-    if not t or not t.hrp.Parent then
-        destroyAlign()
-        destroyWall()
-        return
-    end
-
-    if not rag then pcall(applyStick, t) end
-    pcall(updateWall, t)
-
-    if CFG.LockCam and not rag then
-        local cam = workspace.CurrentCamera
-        if cam then
-            cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(cam.CFrame.Position, predictPos(aimPoint(t))), 0.5)
-        end
-    end
-end))
-
-task.spawn(function()
-    while Running do
-        task.wait(0.07)
-        if CFG.Enabled then
-            local t = pick()
-            State.target = t
-            State.losOK = (not t) or (not CFG.LOSCheck) or hasLOS(t)
-        else
-            State.target = nil
-            State.losOK = true
-        end
-    end
-end)
-
-task.spawn(function()
-    while Running do
-        task.wait(0.02)
-        if CFG.Enabled then
-            local t = State.target
-            if t and t.hrp.Parent and t.hum.Health > 0 then
-                pcall(brain, t)
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while Running do
-        task.wait(0.1)
-        local h = myHum()
-        local c = myChar()
-        if h and c then
-            if CFG.AntiRagdoll and h.PlatformStand then
-                pcall(function() h.PlatformStand = false end)
-            end
-            if CFG.AntiStun then
-                local st = h:GetState()
-                if st == Enum.HumanoidStateType.Physics or st == Enum.HumanoidStateType.FallingDown then
-                    pcall(function() h:ChangeState(Enum.HumanoidStateType.Running) end)
-                end
-                if h.WalkSpeed < 8 and not h.PlatformStand then h.WalkSpeed = 16 end
-            end
-            if CFG.NoFatigue then
-                h.UseJumpPower = true
-                if h.JumpPower < CFG.JumpPower then h.JumpPower = CFG.JumpPower end
-            end
-            if CFG.AntiFling then
-                local r = hrpOf(c)
-                if r and r.AssemblyLinearVelocity.Magnitude > 250 then
-                    r.AssemblyLinearVelocity = r.AssemblyLinearVelocity * 0.15
-                end
-            end
-            if CFG.WalkSpeed > 0 then h.WalkSpeed = CFG.WalkSpeed end
-            if CFG.AnimSpeed ~= 1 then animSpeed() end
-            if CFG.AutoRespawn and h.Health <= 0 then
-                task.wait(1)
-                pcall(function() LP:LoadCharacter() end)
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while Running do
-        task.wait(1)
-        if CFG.Enabled and CFG.ResetStreakAt > 0 then
-            local ls = LP:FindFirstChild("leaderstats")
-            if ls then
-                for _, v in ipairs(ls:GetChildren()) do
-                    if v:IsA("ValueBase") and v.Name:lower():find("streak") then
-                        local n = tonumber(v.Value)
-                        if n and n >= CFG.ResetStreakAt then
-                            pcall(function() LP:LoadCharacter() end)
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while Running do
-        task.wait(CFG.RemoteRate)
-        if CFG.Enabled and CFG.RemoteMode then
-            pcall(fireRemote)
-        end
-    end
-end)
-
-task.spawn(function()
-    while Running do
-        task.wait(CFG.CullRate)
-        if CFG.VFXCull then
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if VFX[d.ClassName] and d.Enabled then d.Enabled = false end
-            end
-            applyLightingCull()
-        end
-    end
-end)
-
-local DRAW = { pool = {}, circle = nil, active = false }
-
-local function espOff()
-    if not DRAW.active then return end
-    for _, e in ipairs(DRAW.pool) do
-        e.line.Visible = false
-        e.text.Visible = false
-    end
-    if DRAW.circle then DRAW.circle.Visible = false end
-    DRAW.active = false
+function Entity.Root()
+    local character = LocalPlayer.Character
+    return character and character:FindFirstChild("HumanoidRootPart")
 end
 
-local function updateESP()
-    if not (CFG.ESP and Drawing and Drawing.new) then
-        espOff()
-        return
+function Entity.Humanoid()
+    local character = LocalPlayer.Character
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+function Entity.HumOf(character)
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+function Entity.RootOf(character)
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+function Entity.IsAlive(player)
+    local character = player.Character
+    if not character then return false end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then return false end
+    if humanoid.Health <= 0 then return false end
+    return true, humanoid, root
+end
+
+function Entity.IsBlocking(character)
+    return Utils.attrBool(character, BLOCK_ATTR)
+end
+
+function Entity.IsStunned(character)
+    return Utils.attrBool(character, STUN_ATTR)
+end
+
+function Entity.IsRagdolled(character, humanoid)
+    if Utils.attrBool(character, RAG_ATTR) then return true end
+    if humanoid and humanoid.PlatformStand then return true end
+    if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Physics then return true end
+    return false
+end
+
+function Entity.IsImmune(player, humanoid, character)
+    if Utils.attrBool(character, IMMUNE_ATTR) then return true end
+    local spawnedAt = SpawnAt[player]
+    if spawnedAt and (os.clock() - spawnedAt) < 2.5 and humanoid.Health >= humanoid.MaxHealth then
+        return true
     end
-    local cam = workspace.CurrentCamera
-    local myR = myHRP()
-    if not cam or not myR then return end
-    DRAW.active = true
-    local vp = cam.ViewportSize
-    local i = 0
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then
-            local c = p.Character
-            local r = hrpOf(c)
-            local h = humOf(c)
-            if r and h and h.Health > 0 then
-                local d = (r.Position - myR.Position).Magnitude
-                if d <= CFG.DrawRange then
-                    local sp, on = cam:WorldToViewportPoint(r.Position)
-                    if on then
-                        i = i + 1
-                        local e = DRAW.pool[i]
-                        if not e then
-                            local ok = pcall(function()
-                                local l = Drawing.new("Line")
-                                l.Thickness = 1.4
-                                local t = Drawing.new("Text")
-                                t.Size = 13
-                                t.Center = true
-                                t.Outline = true
-                                t.Font = 2
-                                DRAW.pool[i] = { line = l, text = t }
-                            end)
-                            if ok then e = DRAW.pool[i] end
-                        end
-                        if e then
-                            e.line.From = Vector2.new(vp.X / 2, vp.Y)
-                            e.line.To = Vector2.new(sp.X, sp.Y)
-                            e.line.Color = Color3.fromRGB(255, 105, 200)
-                            e.line.Visible = true
-                            e.text.Position = Vector2.new(sp.X, sp.Y - 20)
-                            e.text.Text = string.format("%s | %d | %dm", p.Name, math.floor(h.Health), math.floor(d))
-                            e.text.Color = Color3.fromRGB(255, 235, 250)
-                            e.text.Visible = true
-                        end
+    return false
+end
+
+function Entity.IsFriend(player)
+    local cached = FriendCache[player]
+    if cached == nil then
+        local ok, result = pcall(function()
+            return LocalPlayer:IsFriendsWith(player.UserId)
+        end)
+        cached = ok and result or false
+        FriendCache[player] = cached
+    end
+    return cached
+end
+
+function Entity.IsWhitelisted(player)
+    if Config.Whitelist[player.Name] or Config.Whitelist[player.UserId] then
+        return true
+    end
+    if Config.FriendsWhitelist and Entity.IsFriend(player) then
+        return true
+    end
+    return false
+end
+
+function Entity.AimPoint(target)
+    if Config.AimPart ~= "" then
+        local part = target.Character:FindFirstChild(Config.AimPart)
+        if part and part:IsA("BasePart") then
+            return part
+        end
+    end
+    return target.Root
+end
+
+function Entity.IsIdleAnim(player, animation)
+    if not animation then return true end
+    local name = animation.Name:lower()
+    if IDLE_NAMES[name] then return true end
+    for _, hint in ipairs(IDLE_HINTS) do
+        if name:find(hint, 1, true) then return true end
+    end
+    local learned = IdleIds[player]
+    return learned ~= nil and learned[animation.AnimationId] == true
+end
+
+function Entity.MarkAttack(player, track)
+    local animation = track.Animation
+    if not animation then return end
+    if Entity.IsIdleAnim(player, animation) then return end
+    AttackAt[player] = os.clock()
+end
+
+function Entity.IsAttacking(player, character)
+    if Utils.attrBool(character, ATK_ATTR) then return true end
+    local at = AttackAt[player]
+    return at ~= nil and (os.clock() - at) <= Config.AttackWindow
+end
+
+function Entity.LearnIdle(player)
+    local character = player.Character
+    local humanoid = Entity.HumOf(character)
+    if not humanoid then return end
+
+    local learned = IdleIds[player]
+    if not learned then
+        learned = {}
+        IdleIds[player] = learned
+    end
+
+    for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+        local animation = track.Animation
+        if animation then
+            local name = animation.Name:lower()
+            if IDLE_NAMES[name] then
+                learned[animation.AnimationId] = true
+            end
+        end
+    end
+end
+
+function Entity.HookAnimator(player, character)
+    task.spawn(function()
+        local animator = character:FindFirstChildOfClass("Animator")
+        if not animator then
+            local ok, result = pcall(function()
+                return character:WaitForChild("Animator", 6)
+            end)
+            animator = ok and result or nil
+        end
+        if not animator or not animator.Parent then return end
+        maidFor(player):Give(animator.AnimationPlayed:Connect(function(track)
+            Entity.MarkAttack(player, track)
+        end))
+    end)
+end
+
+function Entity.WatchCharacter(player, character)
+    if not character then return end
+    local maid = maidFor(player)
+
+    maid:Give(character.ChildAdded:Connect(function(child)
+        local name = child.Name:lower()
+        for _, hint in ipairs(VFX_NAME_HINTS) do
+            if name:find(hint, 1, true) then
+                AttackAt[player] = os.clock()
+                return
+            end
+        end
+    end))
+
+    local humanoid = Entity.HumOf(character)
+    if humanoid then
+        maid:Give(humanoid.Died:Connect(function()
+            if State.LastHitPlayer ~= player then return end
+            if (os.clock() - State.LastHitAt) > 4 then return end
+            State.Combo = 0
+            if Config.Toxic then
+                Social.Say(Config.ToxicMsgs[math.random(#Config.ToxicMsgs)])
+            end
+        end))
+    end
+
+    Entity.HookAnimator(player, character)
+end
+
+function Entity.OnCharacter(player, character)
+    SpawnAt[player] = os.clock()
+    maidFor(player):Clean()
+    Entity.WatchCharacter(player, character)
+
+    if player == LocalPlayer then
+        Movement.DropAlign()
+        State.Blocking = false
+        State.Combo = 0
+        task.wait(0.6)
+        local humanoid = Entity.HumOf(character)
+        if humanoid then
+            humanoid.AutoRotate = true
+        end
+        task.wait(1.2)
+    else
+        task.wait(0.25)
+    end
+
+    Entity.LearnIdle(player)
+
+    for _ = 1, 12 do
+        task.wait(0.5)
+        if not Runtime.Running or player.Character ~= character then
+            break
+        end
+        Entity.LearnIdle(player)
+    end
+end
+
+--═══════════════════════════════════════════════════════════ TARGETING ══
+
+local Targeting = {}
+
+function Targeting.RefreshSafe()
+    table.clear(SafeParts)
+    for _, child in ipairs(workspace:GetChildren()) do
+        if child:IsA("BasePart") then
+            local name = child.Name:lower()
+            if name:find("safe", 1, true)
+                or name:find("spawn", 1, true)
+                or name:find("lobby", 1, true) then
+                SafeParts[#SafeParts + 1] = child
+            end
+        end
+    end
+    local spawnPart = workspace:FindFirstChildOfClass("SpawnLocation")
+    if spawnPart then
+        SafeParts[#SafeParts + 1] = spawnPart
+    end
+end
+
+function Targeting.InSafe(position)
+    for _, part in ipairs(SafeParts) do
+        local radius = math.max(part.Size.Magnitude * 0.5, 38)
+        if (part.Position - position).Magnitude <= radius then
+            return true
+        end
+    end
+    return false
+end
+
+function Targeting.PassesFilters(player, humanoid, character, root, myPosition)
+    if Config.SafeZoneFilter and Targeting.InSafe(root.Position) then
+        return false
+    end
+    if Config.ImmunityFilter and Entity.IsImmune(player, humanoid, character) then
+        return false
+    end
+    local distance = (root.Position - myPosition).Magnitude
+    if distance > Config.Range then
+        return false
+    end
+    return true, distance
+end
+
+function Targeting.Acquire()
+    local myRoot = Entity.Root()
+    if not myRoot then return nil end
+    local myPosition = myRoot.Position
+
+    if Config.PriorityTarget then
+        local player = Config.PriorityTarget
+        local ok, humanoid, root = Entity.IsAlive(player)
+        if ok and (root.Position - myPosition).Magnitude <= Config.Range * 1.6 then
+            return {
+                Player = player,
+                Character = player.Character,
+                Humanoid = humanoid,
+                Root = root,
+                Distance = (root.Position - myPosition).Magnitude,
+            }
+        end
+    end
+
+    local best, bestKey
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and not Entity.IsWhitelisted(player) then
+            local ok, humanoid, root = Entity.IsAlive(player)
+            if ok then
+                local passes, distance = Targeting.PassesFilters(
+                    player, humanoid, player.Character, root, myPosition
+                )
+                if passes then
+                    local key
+                    if Config.Mode == "Nearest" then
+                        key = distance
+                    elseif Config.Mode == "Farthest" then
+                        key = -distance
+                    elseif Config.Mode == "HighestHP" then
+                        key = -humanoid.Health
+                    else
+                        key = humanoid.Health
+                    end
+                    if not bestKey or key < bestKey then
+                        bestKey = key
+                        best = {
+                            Player = player,
+                            Character = player.Character,
+                            Humanoid = humanoid,
+                            Root = root,
+                            Distance = distance,
+                        }
                     end
                 end
             end
         end
     end
-    for j = i + 1, #DRAW.pool do
-        DRAW.pool[j].line.Visible = false
-        DRAW.pool[j].text.Visible = false
-    end
-    if not DRAW.circle then
+
+    return best
+end
+
+function Targeting.EnsureParams()
+    if LosParams then return LosParams end
+    LosParams = RaycastParams.new()
+    local ok = pcall(function()
+        LosParams.FilterType = Enum.RaycastFilterType.Exclude
+    end)
+    if not ok then
         pcall(function()
-            local c0 = Drawing.new("Circle")
-            c0.Thickness = 1.5
-            c0.NumSides = 48
-            c0.Color = Color3.fromRGB(120, 220, 255)
-            DRAW.circle = c0
+            LosParams.FilterType = Enum.RaycastFilterType.Blacklist
         end)
     end
-    if DRAW.circle then
-        local a = cam:WorldToViewportPoint(myR.Position)
-        local b = cam:WorldToViewportPoint(myR.Position + Vector3.new(CFG.Range, 0, 0))
-        DRAW.circle.Position = Vector2.new(a.X, a.Y)
-        DRAW.circle.Radius = math.abs(b.X - a.X)
-        DRAW.circle.Visible = true
+    LosParams.IgnoreWater = true
+    return LosParams
+end
+
+function Targeting.HasLineOfSight(target)
+    local myRoot = Entity.Root()
+    if not myRoot then return true end
+    local params = Targeting.EnsureParams()
+    local filter = {LocalPlayer.Character, target.Character}
+    if WallPart then
+        filter[#filter + 1] = WallPart
+    end
+    params.FilterDescendantsInstances = filter
+    local hit = workspace:Raycast(myRoot.Position, target.Root.Position - myRoot.Position, params)
+    return hit == nil
+end
+
+--═════════════════════════════════════════════════════════════ MOVEMENT ══
+
+local Movement = {}
+
+function Movement.Lead()
+    if Config.Prediction <= 0 then return 0 end
+    return Utils.clamp(Utils.ping() / 1000, 0.02, Config.MaxLead) * Config.Prediction
+end
+
+function Movement.Predict(part)
+    return part.Position + part.AssemblyLinearVelocity * Movement.Lead()
+end
+
+function Movement.DropAlign()
+    if not AlignRig then return end
+    pcall(function() AlignRig.Position:Destroy() end)
+    pcall(function() AlignRig.Orientation:Destroy() end)
+    pcall(function() AlignRig.Attachment:Destroy() end)
+    AlignRig = nil
+end
+
+function Movement.EnsureAlign()
+    local root = Entity.Root()
+    if not root then return end
+    if AlignRig and AlignRig.Root == root and AlignRig.Attachment.Parent then
+        return
+    end
+    Movement.DropAlign()
+
+    local attachment = Instance.new("Attachment")
+    attachment.Name = "HM_Align"
+    attachment.Parent = root
+
+    local alignPosition = Instance.new("AlignPosition")
+    alignPosition.Mode = Enum.PositionAlignmentMode.OneAttachment
+    alignPosition.Attachment0 = attachment
+    alignPosition.ApplyAtCenterOfMass = true
+    alignPosition.RigidityEnabled = false
+    alignPosition.MaxForce = Config.AlignMaxForce
+    alignPosition.Responsiveness = Config.AlignResponsiveness
+    if Config.AlignMaxVelocity > 0 then
+        alignPosition.MaxVelocity = Config.AlignMaxVelocity
+    end
+    alignPosition.Parent = root
+
+    local alignOrientation = Instance.new("AlignOrientation")
+    alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    alignOrientation.Attachment0 = attachment
+    alignOrientation.RigidityEnabled = false
+    alignOrientation.MaxTorque = Config.AlignMaxForce
+    alignOrientation.Responsiveness = Config.AlignResponsiveness
+    alignOrientation.Parent = root
+
+    AlignRig = {
+        Root = root,
+        Attachment = attachment,
+        Position = alignPosition,
+        Orientation = alignOrientation,
+    }
+end
+
+function Movement.StickGoal(target)
+    local anchor = Entity.AimPoint(target)
+    local point = Movement.Predict(anchor)
+    local goal
+
+    if Config.StickPos == "Behind" then
+        goal = point
+            - anchor.CFrame.LookVector * Config.StickOffset
+            + Vector3.new(0, Config.StickHeight, 0)
+    elseif Config.StickPos == "Front" then
+        goal = point
+            + anchor.CFrame.LookVector * Config.StickOffset
+            + Vector3.new(0, Config.StickHeight, 0)
+    elseif Config.StickPos == "Side" then
+        goal = point
+            + anchor.CFrame.RightVector * Config.StickOffset
+            + Vector3.new(0, Config.StickHeight, 0)
+    else
+        goal = point + Vector3.new(0, Config.AboveHeight, 0)
+    end
+
+    return goal, point
+end
+
+function Movement.ApplyStick(target)
+    local root = Entity.Root()
+    if not root then return end
+    local humanoid = Entity.Humanoid()
+
+    if humanoid and Config.FreezeMove and Config.StickMode == "Physics" then
+        pcall(function()
+            humanoid:Move(Vector3.zero, false)
+        end)
+    end
+
+    if humanoid then
+        humanoid.AutoRotate = false
+    end
+
+    if Config.StickMode == "None" then
+        Movement.DropAlign()
+        if Config.Face then
+            local flat = target.Root.Position - root.Position
+            flat = Vector3.new(flat.X, 0, flat.Z)
+            if flat.Magnitude > 0.4 then
+                root.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+            end
+        end
+        return
+    end
+
+    local goal, point = Movement.StickGoal(target)
+
+    if Config.StickMode == "Physics" then
+        Movement.EnsureAlign()
+        if AlignRig then
+            AlignRig.Position.Position = goal
+            AlignRig.Orientation.CFrame = CFrame.lookAt(root.Position, point)
+        end
+    else
+        Movement.DropAlign()
+        root.CFrame = CFrame.lookAt(goal, point)
+        if Config.HardKillVelocity then
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
     end
 end
 
-M:give(RunService.RenderStepped:Connect(function()
-    if not Running then return end
-    pcall(updateESP)
-end))
-
-M:give(UIS.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    local k = input.KeyCode
-    if k == Enum.KeyCode.F2 then
-        CFG.Enabled = not CFG.Enabled
-    elseif k == Enum.KeyCode.C then
-        CFG.AutoCombo = not CFG.AutoCombo
-        if _G.HM_TOAST then _G.HM_TOAST("AUTO COMBO: " .. (CFG.AutoCombo and "ON" or "OFF"), CFG.AutoCombo) end
-    elseif k == Enum.KeyCode.F3 then
-        CFG.Mode = (CFG.Mode == "LowestHP") and "Nearest" or "LowestHP"
-    elseif k == Enum.KeyCode.F4 then
-        local order = { "Physics", "Hard", "None" }
-        local i = 1
-        for n, v in ipairs(order) do if v == CFG.StickMode then i = n end end
-        CFG.StickMode = order[(i % #order) + 1]
-    elseif k == Enum.KeyCode.F5 then
-        CFG.SilentAim = not CFG.SilentAim
-    elseif k == Enum.KeyCode.F6 then
-        CFG.VFXCull = not CFG.VFXCull
-    elseif k == Enum.KeyCode.F7 then
-        CFG.RemoteLog = not CFG.RemoteLog
-        print("[HOLY MOLY] remote log: " .. tostring(CFG.RemoteLog))
-    elseif k == Enum.KeyCode.F8 then
-        CFG.Enabled = false
-    elseif k == Enum.KeyCode.F9 then
-        local order = { "Behind", "Above", "Front" }
-        local i = 1
-        for n, v in ipairs(order) do if v == CFG.StickPos then i = n end end
-        CFG.StickPos = order[(i % #order) + 1]
-    elseif k == Enum.KeyCode.F10 then
-        CFG.ESP = not CFG.ESP
+function Movement.ApplyReach(target)
+    local root = Entity.Root()
+    if not root then return end
+    if target.Distance < Config.ReachMin or target.Distance > Config.ReachMax then
+        return
     end
-end))
 
-local HM = {}
-_G.HM = HM
+    if Config.StickMode == "Physics" and AlignRig then
+        AlignRig.Position.MaxVelocity = math.huge
+        AlignRig.Position.Responsiveness = 400
+        task.delay(Config.ReachTime, function()
+            if AlignRig and AlignRig.Position.Parent then
+                AlignRig.Position.MaxVelocity =
+                    Config.AlignMaxVelocity > 0 and Config.AlignMaxVelocity or math.huge
+                AlignRig.Position.Responsiveness = Config.AlignResponsiveness
+            end
+        end)
+        return
+    end
 
-local splash = function()
+    local anchor = Entity.AimPoint(target)
+    local direction = anchor.Position - root.Position
+    direction = Vector3.new(direction.X, 0, direction.Z)
+    if direction.Magnitude < 0.5 then return end
+    local goal = anchor.Position - direction.Unit * Config.ReachSnap + Vector3.new(0, 1.5, 0)
+    root.CFrame = CFrame.lookAt(goal, anchor.Position)
+end
+
+function Movement.DropWall()
+    if WallPart then
+        pcall(function() WallPart:Destroy() end)
+        WallPart = nil
+    end
+end
+
+function Movement.EnsureWall()
+    if WallPart and WallPart.Parent then
+        return WallPart
+    end
+    WallPart = Instance.new("Part")
+    WallPart.Name = "HM_Wall"
+    WallPart.Anchored = true
+    WallPart.CanCollide = false
+    WallPart.CanQuery = true
+    WallPart.CanTouch = true
+    WallPart.Massless = true
+    WallPart.CastShadow = false
+    WallPart.Material = Enum.Material.SmoothPlastic
+    WallPart.Transparency = 1
+    WallPart.Size = Vector3.new(Config.WallSize, Config.WallSize, 1)
+    WallPart.Parent = workspace
+    return WallPart
+end
+
+function Movement.UpdateWall(target)
+    if not Config.WallCombo or Config.StickMode == "None" then
+        Movement.DropWall()
+        return
+    end
+    local root = Entity.Root()
+    if not root then return end
+    local direction = target.Root.Position - root.Position
+    direction = Vector3.new(direction.X, 0, direction.Z)
+    if direction.Magnitude < 0.5 then return end
+    local wall = Movement.EnsureWall()
+    wall.Size = Vector3.new(Config.WallSize, Config.WallSize, 1)
+    wall.CFrame = CFrame.lookAt(target.Root.Position + direction.Unit * Config.WallDist, root.Position)
+end
+
+function Movement.SetNoclip(enabled)
+    local character = Entity.Character()
+    if not character then return end
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.CanCollide then
+            if enabled then
+                if NoclipSaved[part] == nil then
+                    NoclipSaved[part] = true
+                end
+                part.CanCollide = false
+            elseif NoclipSaved[part] then
+                part.CanCollide = true
+                NoclipSaved[part] = nil
+            end
+        end
+    end
+end
+
+function Movement.SetFly(enabled)
+    local root = Entity.Root()
+    local humanoid = Entity.Humanoid()
+    if not root or not humanoid then return end
+
+    if enabled then
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        bodyVelocity.Velocity = Vector3.zero
+        bodyVelocity.Parent = root
+        FlyBody = bodyVelocity
+        humanoid.PlatformStand = false
+        State.Flying = true
+    else
+        if FlyBody then
+            FlyBody:Destroy()
+            FlyBody = nil
+        end
+        State.Flying = false
+    end
+end
+
+function Movement.StepFly()
+    if not State.Flying or not FlyBody then return end
+    local camera = workspace.CurrentCamera
+    local root = Entity.Root()
+    if not camera or not root then return end
+
+    local direction = Vector3.zero
+    if UserInput:IsKeyDown(Enum.KeyCode.W) then direction += camera.CFrame.LookVector end
+    if UserInput:IsKeyDown(Enum.KeyCode.S) then direction -= camera.CFrame.LookVector end
+    if UserInput:IsKeyDown(Enum.KeyCode.A) then direction -= camera.CFrame.RightVector end
+    if UserInput:IsKeyDown(Enum.KeyCode.D) then direction += camera.CFrame.RightVector end
+    if UserInput:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.yAxis end
+    if UserInput:IsKeyDown(Enum.KeyCode.LeftControl) then direction -= Vector3.yAxis end
+
+    if direction.Magnitude > 0 then
+        FlyBody.Velocity = direction.Unit * Config.FlySpeed
+    else
+        FlyBody.Velocity = Vector3.zero
+    end
+end
+
+--════════════════════════════════════════════════════════════════ INPUT ══
+
+local Input = {}
+Input.HasMouse = type(mouse1click) == "function"
+
+function Input.Click()
+    if Input.HasMouse then
+        pcall(mouse1click)
+        return
+    end
+    pcall(function()
+        VirtualInput:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+    end)
+    task.delay(0.03, function()
+        pcall(function()
+            VirtualInput:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+        end)
+    end)
+end
+
+function Input.KeyDown(key)
+    local code = Enum.KeyCode[tostring(key):upper()]
+    if not code then return end
+    pcall(function()
+        VirtualInput:SendKeyEvent(true, code, false, game)
+    end)
+end
+
+function Input.KeyUp(key)
+    local code = Enum.KeyCode[tostring(key):upper()]
+    if not code then return end
+    pcall(function()
+        VirtualInput:SendKeyEvent(false, code, false, game)
+    end)
+end
+
+function Input.Press(key, hold)
+    hold = hold or 0.05
+    Input.KeyDown(key)
+    task.delay(hold, function()
+        Input.KeyUp(key)
+    end)
+end
+
+function Input.Dash(direction)
+    if direction then Input.KeyDown(direction) end
+    Input.Press(Config.DashKey)
+    if direction then
+        task.delay(0.12, function()
+            Input.KeyUp(direction)
+        end)
+    end
+end
+
+function Input.DashRandom()
+    if not Config.AutoTech or #Config.TechKeys == 0 then
+        Input.Press(Config.DashKey)
+        return
+    end
+    Input.Dash(Config.TechKeys[math.random(#Config.TechKeys)])
+end
+
+--═══════════════════════════════════════════════════════════════ COMBAT ══
+
+local Combat = {}
+Combat.UltFrame = nil
+
+function Combat.CancelEndlag()
+    if not Config.EndlagCancel then return end
+    task.delay(Config.EndlagTime, function()
+        local humanoid = Entity.Humanoid()
+        if not humanoid or humanoid.PlatformStand then return end
+        if humanoid.FloorMaterial == Enum.Material.Air then return end
+        if humanoid:GetState() ~= Enum.HumanoidStateType.Running then
+            pcall(function()
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            end)
+        end
+    end)
+end
+
+function Combat.Swing(target)
+    local now = os.clock()
+    if now - State.LastM1 > Config.ComboReset then
+        State.Combo = 0
+    end
+    if not Config.ComboInfinite and State.Combo >= Config.ComboHits then
+        return
+    end
+
+    local jitter = 1 + (math.random() - 0.5) * Config.M1Jitter
+    if now - State.LastM1 < Config.M1Delay * jitter then
+        return
+    end
+
+    State.LastM1 = now
+    State.Combo = State.Combo + 1
+    State.LastHitPlayer = target.Player
+    State.LastHitAt = now
+
+    if Config.Reach then
+        pcall(Movement.ApplyReach, target)
+    end
+
+    Input.Click()
+    Combat.CancelEndlag()
+end
+
+function Combat.Feed(target)
+    if not Config.ComboFeeder then return false end
+    local now = os.clock()
+    if now - State.LastFeeder < Config.FeederDelay then return false end
+
+    local ragdolled = Entity.IsRagdolled(target.Character, target.Humanoid)
+    local stunned = Entity.IsStunned(target.Character)
+    local trigger = (ragdolled and Config.FeederOnRagdoll) or (stunned and Config.FeederOnStun)
+    if not trigger then return false end
+
+    State.FeederIndex = (State.FeederIndex % #Config.FeederKeys) + 1
+    State.LastFeeder = now
+    State.LastSkillAny = now
+    Input.Press(Config.FeederKeys[State.FeederIndex])
+    return true
+end
+
+function Combat.RotateSkills(target, blocking)
+    if not Config.AutoSkill then return end
+    local now = os.clock()
+
+    if Entity.IsRagdolled(target.Character, target.Humanoid) then return end
+    if Entity.IsStunned(target.Character) then return end
+    if (now - State.LastSkillAny) < Config.SkillFallback then return end
+    if blocking and not Config.GuardBreakOnBlock then return end
+    if (now - State.LastSkill) < Config.SkillDelay then return end
+
+    State.SkillIndex = (State.SkillIndex % #Config.SkillKeys) + 1
+    State.LastSkill = now
+    State.LastSkillAny = now
+    Input.Press(Config.SkillKeys[State.SkillIndex])
+end
+
+function Combat.FindUltFrame()
+    local gui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not gui then return end
+    for _, descendant in ipairs(gui:GetDescendants()) do
+        if descendant:IsA("Frame") then
+            local name = descendant.Name:lower()
+            if name:find("awaken", 1, true)
+                or name:find("ult", 1, true)
+                or name:find("rage", 1, true)
+                or name:find("power", 1, true)
+                or name:find("energy", 1, true) then
+                Combat.UltFrame = descendant
+                return
+            end
+        end
+    end
+end
+
+function Combat.UltReady()
+    for _, name in ipairs({"Awakening", "Ult", "Ultimate", "Rage", "AwakenValue", "Power", "Energy"}) do
+        local value = LocalPlayer:GetAttribute(name)
+        if value == nil and LocalPlayer.Character then
+            value = LocalPlayer.Character:GetAttribute(name)
+        end
+        if typeof(value) == "number" then
+            if value >= 100 or (value >= 0.99 and value <= 1.01) then
+                return true
+            end
+        elseif value == true then
+            return true
+        end
+    end
+
+    if not Combat.UltFrame or not Combat.UltFrame.Parent then
+        Combat.UltFrame = nil
+        Combat.FindUltFrame()
+    end
+
+    local frame = Combat.UltFrame
+    if not frame then return false end
+    if frame:IsA("Frame") and frame.Size.X.Scale >= 0.97 then return true end
+    for _, descendant in ipairs(frame:GetDescendants()) do
+        if descendant:IsA("Frame") and descendant.Size.X.Scale >= 0.97 then
+            return true
+        end
+    end
+    return false
+end
+
+function Combat.HoldBlock()
+    if State.Blocking then return end
+    local code = Enum.KeyCode[Config.BlockKey:upper()]
+    if not code then return end
+    State.Blocking = true
+    pcall(function()
+        VirtualInput:SendKeyEvent(true, code, false, game)
+    end)
+    task.delay(0.35, function()
+        pcall(function()
+            VirtualInput:SendKeyEvent(false, code, false, game)
+        end)
+        State.Blocking = false
+    end)
+end
+
+function Combat.Brain(target)
+    local now = os.clock()
+    if target.Player ~= State.TargetPlayer then
+        State.TargetPlayer = target.Player
+        State.Combo = 0
+    end
+
+    if Config.AutoWalk
+        and Config.StickMode == "None"
+        and target.Distance > 12
+        and now - State.LastWalk > 0.25 then
+        State.LastWalk = now
+        local humanoid = Entity.Humanoid()
+        if humanoid then
+            pcall(function()
+                humanoid:MoveTo(target.Root.Position)
+            end)
+        end
+    end
+
+    if not Config.AutoCombo then return end
+
+    local blocking = Entity.IsBlocking(target.Character)
+    local ragdolled = Entity.IsRagdolled(target.Character, target.Humanoid)
+    local incoming = Entity.IsAttacking(target.Player, target.Character)
+
+    if Config.AutoDash
+        and not ragdolled
+        and target.Distance > Config.DashRange
+        and now - State.LastDash > 0.6 then
+        State.LastDash = now
+        if Config.StickMode == "None" then
+            Input.Press(Config.DashKey)
+        else
+            Input.DashRandom()
+        end
+    end
+
+    if Config.AutoDodge
+        and target.Distance < 20
+        and not ragdolled
+        and incoming
+        and now - State.LastDodge > 0.4 then
+        State.LastDodge = now
+        if Config.AutoTech then
+            Input.DashRandom()
+        else
+            Input.Press(Config.DodgeKey)
+        end
+    end
+
+    if Config.AutoCounter
+        and target.Distance < Config.CounterRange
+        and incoming
+        and now - State.LastCounter > Config.CounterCooldown then
+        State.LastCounter = now
+        Input.Press(Config.CounterKey)
+    end
+
+    if Config.AutoBlock and target.Distance < 16 and incoming then
+        Combat.HoldBlock()
+    end
+
+    if not Combat.Feed(target) then
+        Combat.RotateSkills(target, blocking)
+    end
+
+    if Config.Awaken
+        and now - State.LastAwaken > Config.AwakenDelay
+        and Combat.UltReady() then
+        State.LastAwaken = now
+        Input.Press(Config.AwakenKey)
+    end
+
+    if Config.AutoM1 and (State.LosClear or not Config.LOSCheck) then
+        Combat.Swing(target)
+    end
+end
+
+--══════════════════════════════════════════════════════════════ SOCIAL ══
+
+local Social = {}
+
+function Social.Say(message)
+    pcall(function()
+        local channel = TextChat.TextChannels:FindFirstChild("RBXGeneral")
+        if channel then
+            channel:SendAsync(message)
+            return
+        end
+    end)
+    pcall(function()
+        Replicated.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, "All")
+    end)
+end
+
+function Social.InstallAntiAFK()
+    RootMaid:Give(LocalPlayer.Idled:Connect(function()
+        if not Config.AutoAFK then return end
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end))
+end
+
+function Social.ServerHop()
+    task.spawn(function()
+        local ok, response = pcall(function()
+            return game:HttpGet(
+                "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?limit=100"
+            )
+        end)
+        if not ok or not response then return end
+
+        local decoded
+        local ok2, result = pcall(function()
+            return HttpService:JSONDecode(response)
+        end)
+        if ok2 then decoded = result end
+        if not decoded or not decoded.data then return end
+
+        for _, server in ipairs(decoded.data) do
+            if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                pcall(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                end)
+                return
+            end
+        end
+    end)
+end
+
+function Social.TeleportTo(player)
+    local root = Entity.Root()
+    local targetRoot = Entity.RootOf(player.Character)
+    if not root or not targetRoot then return end
+    root.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, 2, 0))
+end
+
+function Social.TeleportBehind(player)
+    local root = Entity.Root()
+    local targetRoot = Entity.RootOf(player.Character)
+    if not root or not targetRoot then return end
+    root.CFrame = CFrame.lookAt(
+        targetRoot.Position - targetRoot.CFrame.LookVector * 4 + Vector3.new(0, 2, 0),
+        targetRoot.Position
+    )
+end
+
+--═════════════════════════════════════════════════════════════════ NET ══
+
+local Net = {}
+
+function Net.InstallHook()
     local ok = pcall(function()
-        local sg = Instance.new("ScreenGui")
-        sg.Name = "HolyMolySplash"
-        sg.IgnoreGuiInset = true
-        sg.DisplayOrder = 999
-        sg.ResetOnSpawn = false
-        sg.Parent = game:GetService("CoreGui")
+        local metatable = getrawmetatable(game)
+        local originalNamecall = metatable.__namecall
+        setreadonly(metatable, false)
+
+        metatable.__namecall = function(self, ...)
+            local method = getnamecallmethod()
+
+            if method == "FireServer" or method == "InvokeServer" then
+                if Config.RemoteLog and typeof(self) == "Instance" then
+                    print("[HM] " .. method .. " -> " .. self:GetFullName(), ...)
+                end
+            elseif method == "Raycast" and Config.SilentAim and self == workspace and State.Target then
+                local origin, _, params = ...
+                if typeof(origin) == "Vector3" then
+                    local root = Entity.Root()
+                    if root and (origin - root.Position).Magnitude < 20 then
+                        local aim = Entity.AimPoint(State.Target)
+                        return originalNamecall(self, origin, aim.Position - origin, params)
+                    end
+                end
+            end
+
+            return originalNamecall(self, ...)
+        end
+
+        setreadonly(metatable, true)
+    end)
+    return ok
+end
+
+local RemoteCache
+
+function Net.FindRemote()
+    if RemoteCache and RemoteCache.Parent then
+        return RemoteCache
+    end
+    RemoteCache = nil
+    if Config.RemoteName == "" then return nil end
+
+    for _, descendant in ipairs(Replicated:GetDescendants()) do
+        if (descendant:IsA("RemoteEvent") or descendant:IsA("UnreliableRemoteEvent"))
+            and descendant.Name == Config.RemoteName then
+            RemoteCache = descendant
+            return descendant
+        end
+    end
+    return nil
+end
+
+function Net.Fire()
+    local remote = Net.FindRemote()
+    local target = State.Target
+    if not remote or not target then return end
+
+    local arg = Config.RemoteArg
+    pcall(function()
+        if arg == "player" then
+            remote:FireServer(target.Player)
+        elseif arg == "char" then
+            remote:FireServer(target.Character)
+        elseif arg == "hrp" then
+            remote:FireServer(target.Root)
+        elseif arg == "pos" then
+            remote:FireServer(target.Root.Position)
+        else
+            remote:FireServer()
+        end
+    end)
+end
+
+--═══════════════════════════════════════════════════════════════ VISUALS ══
+
+local Visuals = {}
+
+function Visuals.IsHitboxName(name)
+    local lower = name:lower()
+    for _, hint in ipairs(HB_HINTS) do
+        if lower:find(hint, 1, true) then return true end
+    end
+    return false
+end
+
+function Visuals.ExpandHitbox(part)
+    if Config.HitboxScale == 1 then return end
+    if not part:IsA("BasePart") then return end
+    if LIMB_NAMES[part.Name] then return end
+    if not Visuals.IsHitboxName(part.Name) then return end
+
+    local base = part:GetAttribute("HM_Base")
+    if not base or (base * Config.HitboxScale - part.Size).Magnitude > 0.35 then
+        base = part.Size
+        pcall(function()
+            part:SetAttribute("HM_Base", base)
+        end)
+    end
+    part.Size = base * Config.HitboxScale
+end
+
+function Visuals.ArmHitbox(part)
+    Visuals.ExpandHitbox(part)
+    task.spawn(function()
+        local deadline = os.clock() + Config.HitboxHold
+        while os.clock() < deadline do
+            task.wait(0.03)
+            if not part.Parent then break end
+            Visuals.ExpandHitbox(part)
+        end
+    end)
+end
+
+function Visuals.ApplyLightingCull()
+    if not Config.LightingCull then return end
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if LIGHT_CLASSES[child.ClassName] and child.Enabled then
+            child.Enabled = false
+        end
+    end
+    Lighting.GlobalShadows = false
+end
+
+function Visuals.RestoreLighting()
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if LIGHT_CLASSES[child.ClassName] then
+            child.Enabled = true
+        end
+    end
+    Lighting.GlobalShadows = true
+end
+
+function Visuals.SetChams(player, enabled)
+    local character = player.Character
+    if not character then return end
+
+    if enabled then
+        if ChamCache[player] and ChamCache[player].Parent then return end
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "HM_Chams"
+        highlight.FillColor = Theme.accent
+        highlight.FillTransparency = 0.6
+        highlight.OutlineColor = Theme.accent
+        highlight.OutlineTransparency = 0
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = character
+        ChamCache[player] = highlight
+    else
+        if ChamCache[player] then
+            pcall(function() ChamCache[player]:Destroy() end)
+            ChamCache[player] = nil
+        end
+    end
+end
+
+local Esp = {
+    Pool = {},
+    Active = false,
+}
+
+function Visuals.EspHide()
+    if not Esp.Active then return end
+    for _, entry in ipairs(Esp.Pool) do
+        entry.Box.Visible = false
+        entry.Tracer.Visible = false
+        entry.Name.Visible = false
+        entry.Distance.Visible = false
+        entry.HealthBack.Visible = false
+        entry.HealthFill.Visible = false
+    end
+    if ReachCircle then ReachCircle.Visible = false end
+    Esp.Active = false
+end
+
+local function espEntry(index)
+    local entry = Esp.Pool[index]
+    if entry then return entry end
+
+    local ok = pcall(function()
+        local box = Drawing.new("Square")
+        box.Thickness = 1.4
+        box.Filled = false
+        box.Color = Theme.accent
+
+        local tracer = Drawing.new("Line")
+        tracer.Thickness = 1.2
+        tracer.Color = Theme.accent
+
+        local nameText = Drawing.new("Text")
+        nameText.Size = 13
+        nameText.Center = true
+        nameText.Outline = true
+        nameText.Font = 2
+        nameText.Color = Color3.fromRGB(255, 236, 250)
+
+        local distanceText = Drawing.new("Text")
+        distanceText.Size = 12
+        distanceText.Center = true
+        distanceText.Outline = true
+        distanceText.Font = 2
+        distanceText.Color = Color3.fromRGB(200, 200, 216)
+
+        local healthBack = Drawing.new("Square")
+        healthBack.Thickness = 1
+        healthBack.Filled = true
+        healthBack.Color = Color3.fromRGB(20, 20, 26)
+
+        local healthFill = Drawing.new("Square")
+        healthFill.Thickness = 1
+        healthFill.Filled = true
+        healthFill.Color = Color3.fromRGB(110, 230, 160)
+
+        Esp.Pool[index] = {
+            Box = box,
+            Tracer = tracer,
+            Name = nameText,
+            Distance = distanceText,
+            HealthBack = healthBack,
+            HealthFill = healthFill,
+        }
+    end)
+
+    if ok then return Esp.Pool[index] end
+    return nil
+end
+
+function Visuals.UpdateEsp()
+    if not (Config.ESP and Drawing and Drawing.new) then
+        Visuals.EspHide()
+        return
+    end
+
+    local camera = workspace.CurrentCamera
+    local myRoot = Entity.Root()
+    if not camera or not myRoot then return end
+
+    Esp.Active = true
+    local viewport = camera.ViewportSize
+    local index = 0
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local ok, humanoid, root = Entity.IsAlive(player)
+            if ok then
+                local distance = (root.Position - myRoot.Position).Magnitude
+                if distance <= Config.DrawRange then
+                    local top, onTop = camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0))
+                    local bottom = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+
+                    if onTop then
+                        index = index + 1
+                        local entry = espEntry(index)
+                        if entry then
+                            local height = math.abs(bottom.Y - top.Y)
+                            local width = height * 0.55
+                            local center = Vector2.new((top.X + bottom.X) / 2, (top.Y + bottom.Y) / 2)
+
+                            entry.Box.Size = Vector2.new(width, height)
+                            entry.Box.Position = Vector2.new(center.X - width / 2, center.Y - height / 2)
+                            entry.Box.Visible = Config.ESPBox
+                            entry.Box.Color = Theme.accent
+
+                            entry.Tracer.From = Vector2.new(viewport.X / 2, viewport.Y)
+                            entry.Tracer.To = Vector2.new(bottom.X, bottom.Y)
+                            entry.Tracer.Visible = Config.ESPTracer
+
+                            entry.Name.Position = Vector2.new(center.X, top.Y - 18)
+                            entry.Name.Text = player.Name
+                            entry.Name.Visible = Config.ESPName
+
+                            entry.Distance.Position = Vector2.new(center.X, bottom.Y + 4)
+                            entry.Distance.Text = string.format("%dm", math.floor(distance))
+                            entry.Distance.Visible = Config.ESPDistance
+
+                            local healthRatio = humanoid.Health / humanoid.MaxHealth
+                            entry.HealthBack.Size = Vector2.new(3, height)
+                            entry.HealthBack.Position = Vector2.new(center.X - width / 2 - 6, center.Y - height / 2)
+                            entry.HealthBack.Visible = Config.ESPHealth
+
+                            entry.HealthFill.Size = Vector2.new(3, height * healthRatio)
+                            entry.HealthFill.Position = Vector2.new(
+                                center.X - width / 2 - 6,
+                                center.Y - height / 2 + (height - height * healthRatio)
+                            )
+                            entry.HealthFill.Color = healthRatio > 0.5 and Theme.good
+                                or (healthRatio > 0.25 and Theme.warn or Theme.bad)
+                            entry.HealthFill.Visible = Config.ESPHealth
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    for i = index + 1, #Esp.Pool do
+        local entry = Esp.Pool[i]
+        entry.Box.Visible = false
+        entry.Tracer.Visible = false
+        entry.Name.Visible = false
+        entry.Distance.Visible = false
+        entry.HealthBack.Visible = false
+        entry.HealthFill.Visible = false
+    end
+
+    if Config.ReachCircle then
+        if not ReachCircle then
+            pcall(function()
+                local circle = Drawing.new("Circle")
+                circle.Thickness = 1.5
+                circle.NumSides = 64
+                circle.Color = Theme.accent_2
+                ReachCircle = circle
+            end)
+        end
+        if ReachCircle then
+            local center = camera:WorldToViewportPoint(myRoot.Position)
+            local edge = camera:WorldToViewportPoint(myRoot.Position + Vector3.new(Config.Range, 0, 0))
+            ReachCircle.Position = Vector2.new(center.X, center.Y)
+            ReachCircle.Radius = math.abs(edge.X - center.X)
+            ReachCircle.Visible = true
+        end
+    elseif ReachCircle then
+        ReachCircle.Visible = false
+    end
+end
+
+function Visuals.SetWatermark(enabled)
+    if enabled and not Visuals.WatermarkGui then
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "HM_Watermark"
+        gui.ResetOnSpawn = false
+        gui.IgnoreGuiInset = true
+        gui.DisplayOrder = 70
+        gui.Parent = CoreGui
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.fromOffset(210, 24)
+        frame.Position = UDim2.new(0, 12, 0, 10)
+        frame.BackgroundColor3 = Theme.bg
+        frame.BackgroundTransparency = 0.15
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
+        Utils.corner(frame, 6)
+        Utils.stroke(frame, Theme.accent, 1, 0.5)
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -12, 1, 0)
+        label.Position = UDim2.new(0, 6, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Font = Font.bold
+        label.TextSize = 11
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextColor3 = Theme.text
+        label.Text = "HOLY MOLY! FARM"
+        label.Parent = frame
+
+        Visuals.WatermarkGui = gui
+        Visuals.WatermarkLabel = label
+    elseif not enabled and Visuals.WatermarkGui then
+        Visuals.WatermarkGui:Destroy()
+        Visuals.WatermarkGui = nil
+        Visuals.WatermarkLabel = nil
+    end
+end
+
+function Visuals.UpdateWatermark()
+    if not Visuals.WatermarkLabel then return end
+    local ok, fps = pcall(function()
+        return math.floor(1 / math.max(RunService.RenderStepped:Wait(), 0.0001))
+    end)
+    Visuals.WatermarkLabel.Text = string.format(
+        "HOLY MOLY! FARM v%s  ·  %s  ·  %dms  ·  %d fps",
+        Runtime.Version,
+        State.Target and State.Target.Player.Name or "idle",
+        math.floor(Utils.ping()),
+        ok and fps or 0
+    )
+end
+
+--═════════════════════════════════════════════════════════════ NOTIFY ══
+
+local Notify = {}
+Notify.Holder = nil
+
+function Notify.Mount()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "HM_Toasts"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 65
+    gui.Parent = CoreGui
+
+    local holder = Instance.new("Frame")
+    holder.AnchorPoint = Vector2.new(1, 0)
+    holder.Position = UDim2.new(1, -16, 0, 100)
+    holder.Size = UDim2.fromOffset(230, 500)
+    holder.BackgroundTransparency = 1
+    holder.Parent = gui
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 6)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = holder
+
+    Notify.Holder = holder
+    Notify.Gui = gui
+end
+
+function Notify.Push(message, kind)
+    local holder = Notify.Holder
+    if not holder then return end
+
+    local accent, icon
+    if kind == "error" then
+        accent, icon = Theme.bad, "!"
+    elseif kind == "warn" then
+        accent, icon = Theme.warn, "?"
+    elseif kind == "success" then
+        accent, icon = Theme.good, "+"
+    else
+        accent, icon = Theme.accent, "·"
+    end
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.fromOffset(0, 30)
+    frame.BackgroundColor3 = Theme.bg_alt
+    frame.BackgroundTransparency = 0.06
+    frame.BorderSizePixel = 0
+    frame.Parent = holder
+    Utils.corner(frame, 8)
+
+    local stroke = Utils.stroke(frame, accent, 1, 0.5)
+
+    local badge = Instance.new("TextLabel")
+    badge.Size = UDim2.fromOffset(20, 30)
+    badge.Position = UDim2.new(0, 6, 0, 0)
+    badge.BackgroundTransparency = 1
+    badge.Font = Font.black
+    badge.TextSize = 14
+    badge.TextColor3 = accent
+    badge.Text = icon
+    badge.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -34, 1, 0)
+    label.Position = UDim2.new(0, 26, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Font.bold
+    label.TextSize = 11
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextTruncate = Enum.TextTruncate.AtEnd
+    label.TextTransparency = 1
+    label.TextColor3 = Theme.text
+    label.Text = message
+    label.Parent = frame
+
+    Utils.tween(frame, 0.26, {Size = UDim2.fromOffset(230, 30)}, Enum.EasingStyle.Back)
+    Utils.tween(label, 0.24, {TextTransparency = 0})
+
+    task.delay(2.0, function()
+        Utils.tween(frame, 0.28, {
+            Size = UDim2.fromOffset(0, 30),
+            BackgroundTransparency = 1,
+        }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        Utils.tween(stroke, 0.28, {Transparency = 1})
+        Utils.tween(label, 0.24, {TextTransparency = 1})
+        task.delay(0.34, function()
+            pcall(function() frame:Destroy() end)
+        end)
+    end)
+end
+
+--═══════════════════════════════════════════════════════════════════ UI ══
+
+local UI = {}
+UI.__index = UI
+
+local Window
+local Tabs = {}
+local ActiveTab
+local Popups = {}
+
+local function bindFlag(flag, callback)
+    if not flag then return nil end
+    return function(value)
+        Config[flag] = value
+        if callback then callback(value) end
+    end
+end
+
+local function getFlag(flag)
+    if not flag then return nil end
+    return Config[flag]
+end
+
+--───────────────────────────────────────────────── window construction
+
+function UI.new(props)
+    local self = setmetatable({}, UI)
+
+    self.Tabs = {}
+    self.Widgets = {}
+    self.ActiveTab = nil
+    self.Open = true
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "HM_Menu"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 50
+    gui.Parent = CoreGui
+    self.Gui = gui
+
+    local root = Instance.new("CanvasGroup")
+    root.Name = "Root"
+    root.Size = UDim2.fromOffset(props.width or 620, props.height or 420)
+    root.Position = UDim2.new(0, 40, 0.5, -210)
+    root.BackgroundColor3 = Theme.bg
+    root.BackgroundTransparency = 0.03
+    root.GroupTransparency = 1
+    root.BorderSizePixel = 0
+    root.Visible = false
+    root.Parent = gui
+    self.Root = root
+    Utils.corner(root, 12)
+
+    local rootStroke = Utils.stroke(root, Theme.accent, 1.2, 0.55)
+    self.RootStroke = rootStroke
+
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 38)
+    header.BackgroundColor3 = Theme.bg_alt
+    header.BackgroundTransparency = 0.35
+    header.BorderSizePixel = 0
+    header.Parent = root
+    self.Header = header
+
+    local headerCorner = Instance.new("UICorner")
+    headerCorner.CornerRadius = UDim.new(0, 12)
+    headerCorner.Parent = header
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(0, 300, 1, 0)
+    title.Position = UDim2.new(0, 14, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Font = Font.black
+    title.TextSize = 15
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextColor3 = Theme.accent
+    title.Text = props.title or "HOLY MOLY! FARM"
+    title.Parent = header
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Theme.accent),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 240, 252)),
+        ColorSequenceKeypoint.new(1, Theme.accent),
+    })
+    gradient.Parent = title
+    self.TitleGradient = gradient
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.Size = UDim2.new(0, 200, 1, 0)
+    subtitle.Position = UDim2.new(0, 14, 0, 12)
+    subtitle.BackgroundTransparency = 1
+    subtitle.Font = Font.bold
+    subtitle.TextSize = 10
+    subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    subtitle.TextColor3 = Theme.text_faint
+    subtitle.Text = props.subtitle or "MADE BY ZED"
+    subtitle.Parent = header
+
+    local minimize = Instance.new("TextButton")
+    minimize.AnchorPoint = Vector2.new(1, 0.5)
+    minimize.Size = UDim2.fromOffset(24, 24)
+    minimize.Position = UDim2.new(1, -12, 0.5, 0)
+    minimize.BackgroundColor3 = Theme.bg_row
+    minimize.BorderSizePixel = 0
+    minimize.Font = Font.black
+    minimize.TextSize = 15
+    minimize.TextColor3 = Theme.text
+    minimize.Text = "–"
+    minimize.Parent = header
+    Utils.corner(minimize, 6)
+
+    self.Minimize = minimize
+
+    local sidebar = Instance.new("Frame")
+    sidebar.Size = UDim2.new(0, 132, 1, -50)
+    sidebar.Position = UDim2.new(0, 8, 0, 44)
+    sidebar.BackgroundColor3 = Theme.bg_alt
+    sidebar.BackgroundTransparency = 0.5
+    sidebar.BorderSizePixel = 0
+    sidebar.Parent = root
+    Utils.corner(sidebar, 8)
+    self.Sidebar = sidebar
+
+    local sidebarLayout = Instance.new("UIListLayout")
+    sidebarLayout.Padding = UDim.new(0, 4)
+    sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    sidebarLayout.Parent = sidebar
+    Utils.pad(sidebar, 6, 6, 6, 6)
+
+    local content = Instance.new("Frame")
+    content.Size = UDim2.new(1, -156, 1, -50)
+    content.Position = UDim2.new(0, 148, 0, 44)
+    content.BackgroundTransparency = 1
+    content.Parent = root
+    self.Content = content
+
+    self.PageLayout = Instance.new("UIListLayout")
+    self.PageLayout.Padding = UDim.new(0, 8)
+    self.PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    self.PageLayout.Parent = content
+
+    self.Tabs = {}
+    self.Pages = {}
+
+    -- dragging
+    local dragging, dragStart, startPos
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = root.Position
+        end
+    end)
+    header.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInput.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement
+            and input.UserInputType ~= Enum.UserInputType.Touch then
+            return
+        end
+        local delta = input.Position - dragStart
+        root.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end)
+
+    minimize.MouseButton1Click:Connect(function()
+        self:SetOpen(not self.Open)
+    end)
+
+    self:BuildTabButton("Combat")
+    self:BuildTabButton("Movement")
+    self:BuildTabButton("Visuals")
+    self:BuildTabButton("Players")
+    self:BuildTabButton("Misc")
+
+    task.spawn(function()
+        task.wait(0.15)
+        root.Visible = true
+        Utils.tween(root, 0.5, {
+            GroupTransparency = 0,
+            Position = UDim2.new(0, 40, 0.5, -210),
+        }, Enum.EasingStyle.Back)
+    end)
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(0.05)
+            pcall(function()
+                rootStroke.Transparency = 0.55 + math.sin(os.clock() * 2.5) * 0.2
+                gradient.Offset = Vector2.new(math.sin(os.clock() * 1.3) * 0.25, 0)
+            end)
+        end
+    end)
+
+    self:SelectTab("Combat")
+    Window = self
+    return self
+end
+
+function UI:BuildTabButton(name)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 26)
+    button.BackgroundColor3 = Theme.bg_row
+    button.BackgroundTransparency = 0.4
+    button.BorderSizePixel = 0
+    button.Font = Font.bold
+    button.TextSize = 11
+    button.TextColor3 = Theme.text_dim
+    button.TextXAlignment = Enum.TextXAlignment.Left
+    button.Text = "  " .. name
+    button.Parent = self.Sidebar
+    Utils.corner(button, 6)
+    Utils.pad(button, 0, 0, 0, 6)
+
+    local page = Instance.new("ScrollingFrame")
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 3
+    page.ScrollBarImageColor3 = Theme.accent
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.Visible = false
+    page.Parent = self.Content
+
+    local pageLayout = Instance.new("UIListLayout")
+    pageLayout.Padding = UDim.new(0, 8)
+    pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    pageLayout.Parent = page
+
+    local pagePadding = Instance.new("UIPadding")
+    pagePadding.PaddingRight = UDim.new(0, 6)
+    pagePadding.PaddingBottom = UDim.new(0, 8)
+    pagePadding.Parent = page
+
+    pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 12)
+    end)
+
+    local record = {
+        Name = name,
+        Button = button,
+        Page = page,
+        Sections = {},
+    }
+
+    button.MouseEnter:Connect(function()
+        if self.ActiveTab ~= name then
+            Utils.tween(button, 0.12, {BackgroundColor3 = Theme.bg_hover})
+        end
+    end)
+    button.MouseLeave:Connect(function()
+        if self.ActiveTab ~= name then
+            Utils.tween(button, 0.12, {BackgroundColor3 = Theme.bg_row})
+        end
+    end)
+    button.MouseButton1Click:Connect(function()
+        self:SelectTab(name)
+    end)
+
+    self.Tabs[name] = record
+    return record
+end
+
+function UI:SelectTab(name)
+    for tabName, record in pairs(self.Tabs) do
+        local active = tabName == name
+        record.Page.Visible = active
+        Utils.tween(record.Button, 0.15, {
+            BackgroundColor3 = active and Theme.accent_dim or Theme.bg_row,
+            TextColor3 = active and Theme.text or Theme.text_dim,
+            BackgroundTransparency = active and 0 or 0.4,
+        })
+    end
+    self.ActiveTab = name
+end
+
+function UI:SetOpen(open)
+    self.Open = open
+    if open then
+        self.Root.Visible = true
+        Utils.tween(self.Root, 0.35, {GroupTransparency = 0}, Enum.EasingStyle.Back)
+    else
+        Utils.tween(self.Root, 0.22, {GroupTransparency = 1}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        task.delay(0.24, function()
+            if not self.Open then
+                self.Root.Visible = false
+            end
+        end)
+    end
+end
+
+function UI:Section(tabName, sectionName)
+    local tab = self.Tabs[tabName]
+    if not tab then return nil end
+
+    local section = Instance.new("Frame")
+    section.Size = UDim2.new(1, 0, 0, 30)
+    section.BackgroundColor3 = Theme.bg_alt
+    section.BackgroundTransparency = 0.25
+    section.BorderSizePixel = 0
+    section.AutomaticSize = Enum.AutomaticSize.Y
+    section.Parent = tab.Page
+    Utils.corner(section, 8)
+
+    local sectionStroke = Utils.stroke(section, Theme.stroke, 1, 0.6)
+
+    local header = Instance.new("TextButton")
+    header.Size = UDim2.new(1, 0, 0, 28)
+    header.BackgroundTransparency = 1
+    header.Font = Font.black
+    header.TextSize = 11
+    header.TextXAlignment = Enum.TextXAlignment.Left
+    header.TextColor3 = Theme.accent
+    header.Text = "  " .. sectionName
+    header.Parent = section
+
+    local chevron = Instance.new("TextLabel")
+    chevron.AnchorPoint = Vector2.new(1, 0)
+    chevron.Size = UDim2.fromOffset(20, 28)
+    chevron.Position = UDim2.new(1, -10, 0, 0)
+    chevron.BackgroundTransparency = 1
+    chevron.Font = Font.bold
+    chevron.TextSize = 12
+    chevron.TextColor3 = Theme.text_dim
+    chevron.Text = "▾"
+    chevron.Parent = section
+
+    local body = Instance.new("Frame")
+    body.Size = UDim2.new(1, 0, 0, 0)
+    body.BackgroundTransparency = 1
+    body.AutomaticSize = Enum.AutomaticSize.Y
+    body.Position = UDim2.new(0, 0, 0, 28)
+    body.Parent = section
+
+    local bodyLayout = Instance.new("UIListLayout")
+    bodyLayout.Padding = UDim.new(0, 4)
+    bodyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    bodyLayout.Parent = body
+
+    local bodyPad = Instance.new("UIPadding")
+    bodyPad.PaddingTop = UDim.new(0, 2)
+    bodyPad.PaddingRight = UDim.new(0, 10)
+    bodyPad.PaddingBottom = UDim.new(0, 10)
+    bodyPad.PaddingLeft = UDim.new(0, 10)
+    bodyPad.Parent = body
+
+    local api = setmetatable({
+        Frame = section,
+        Body = body,
+        Layout = bodyLayout,
+        TabName = tabName,
+        Name = sectionName,
+    }, UI)
+
+    local collapsed = false
+    header.MouseButton1Click:Connect(function()
+        collapsed = not collapsed
+        body.Visible = not collapsed
+        chevron.Text = collapsed and "▸" or "▾"
+    end)
+
+    tab.Sections[#tab.Sections + 1] = api
+    return api
+end
+
+--────────────────────────────────────────────────────────── row helper
+
+function UI:Row(height)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, height or 24)
+    row.BackgroundTransparency = 1
+    row.Parent = self.Body
+    return row
+end
+
+function UI:RowLabel(row, text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -90, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Font.med
+    label.TextSize = 11
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextColor3 = Theme.text
+    label.Text = text
+    label.Parent = row
+    return label
+end
+
+--────────────────────────────────────────────────────────────── toggle
+
+function UI:Toggle(props)
+    local row = self:Row(26)
+    self:RowLabel(row, props.text)
+
+    local pill = Instance.new("TextButton")
+    pill.AnchorPoint = Vector2.new(1, 0.5)
+    pill.Size = UDim2.fromOffset(38, 18)
+    pill.Position = UDim2.new(1, 0, 0.5, 0)
+    pill.BackgroundColor3 = Theme.bg_row
+    pill.BorderSizePixel = 0
+    pill.Text = ""
+    pill.Parent = row
+    Utils.corner(pill, 9)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(14, 14)
+    knob.Position = UDim2.new(0, 2, 0.5, -7)
+    knob.BackgroundColor3 = Theme.text_faint
+    knob.BorderSizePixel = 0
+    knob.Parent = pill
+    Utils.corner(knob, 7)
+
+    local widget = { State = false, Row = row }
+
+    local function paint(value)
+        widget.State = value
+        Utils.tween(pill, 0.16, {
+            BackgroundColor3 = value and Theme.accent_dim or Theme.bg_row,
+        })
+        Utils.tween(knob, 0.16, {
+            Position = value and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7),
+            BackgroundColor3 = value and Theme.accent or Theme.text_faint,
+        })
+    end
+
+    local setter = bindFlag(props.flag, function(value)
+        if props.callback then props.callback(value) end
+    end)
+
+    pill.MouseButton1Click:Connect(function()
+        local value = not widget.State
+        if setter then
+            setter(value)
+        end
+        paint(value)
+        Notify.Push((props.text or "") .. ": " .. (value and "ON" or "OFF"), value and "success" or "info")
+    end)
+
+    local initial = props.default
+    if props.flag then
+        initial = Config[props.flag]
+    end
+    paint(initial == true)
+
+    widget.Set = function(value)
+        if setter then setter(value) end
+        paint(value)
+    end
+
+    self.Widgets[#self.Widgets + 1] = widget
+    return widget
+end
+
+--────────────────────────────────────────────────────────────── slider
+
+function UI:Slider(props)
+    local row = self:Row(34)
+
+    local label = self:RowLabel(row, props.text)
+    label.Size = UDim2.new(1, -70, 0, 14)
+    label.Position = UDim2.new(0, 0, 0, 0)
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.AnchorPoint = Vector2.new(1, 0)
+    valueLabel.Size = UDim2.fromOffset(70, 14)
+    valueLabel.Position = UDim2.new(1, 0, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Font = Font.bold
+    valueLabel.TextSize = 11
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valueLabel.TextColor3 = Theme.accent
+    valueLabel.Text = tostring(props.default or 0)
+    valueLabel.Parent = row
+
+    local track = Instance.new("TextButton")
+    track.Size = UDim2.new(1, 0, 0, 6)
+    track.Position = UDim2.new(0, 0, 0, 20)
+    track.BackgroundColor3 = Theme.bg_row
+    track.BorderSizePixel = 0
+    track.Text = ""
+    track.Parent = row
+    Utils.corner(track, 3)
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.BackgroundColor3 = Theme.accent
+    fill.BorderSizePixel = 0
+    fill.Parent = track
+    Utils.corner(fill, 3)
+
+    local knob = Instance.new("Frame")
+    knob.AnchorPoint = Vector2.new(0.5, 0.5)
+    knob.Size = UDim2.fromOffset(12, 12)
+    knob.Position = UDim2.new(0, 0, 0.5, 0)
+    knob.BackgroundColor3 = Theme.text
+    knob.BorderSizePixel = 0
+    knob.Parent = track
+    Utils.corner(knob, 6)
+
+    local min = props.min or 0
+    local max = props.max or 100
+    local decimals = props.decimals or 0
+    local value = props.default or min
+    if props.flag and Config[props.flag] ~= nil then
+        value = Config[props.flag]
+    end
+
+    local widget = { Value = value }
+    local dragging = false
+
+    local function render()
+        local ratio = (value - min) / math.max(max - min, 0.0001)
+        ratio = Utils.clamp(ratio, 0, 1)
+        fill.Size = UDim2.new(ratio, 0, 1, 0)
+        knob.Position = UDim2.new(ratio, 0, 0.5, 0)
+        valueLabel.Text = tostring(Utils.round(value, decimals))
+    end
+
+    local setter = bindFlag(props.flag)
+
+    local function commit(newValue)
+        value = Utils.clamp(newValue, min, max)
+        if props.integer then
+            value = math.floor(value + 0.5)
+        end
+        render()
+        if setter then
+            setter(value)
+        end
+        if props.callback then
+            props.callback(value)
+        end
+    end
+
+    local function fromInput(input)
+        local relative = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
+        commit(min + (max - min) * Utils.clamp(relative, 0, 1))
+    end
+
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            fromInput(input)
+        end
+    end)
+    UserInput.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+            fromInput(input)
+        end
+    end)
+    UserInput.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    render()
+
+    widget.Set = function(newValue)
+        commit(newValue)
+    end
+
+    self.Widgets[#self.Widgets + 1] = widget
+    return widget
+end
+
+--──────────────────────────────────────────────────────────── dropdown
+
+local function closeAllPopups(except)
+    for _, popup in ipairs(Popups) do
+        if popup ~= except and popup.Visible then
+            popup.Visible = false
+        end
+    end
+end
+
+function UI:Dropdown(props)
+    local row = self:Row(28)
+    self:RowLabel(row, props.text)
+
+    local display = Instance.new("TextButton")
+    display.AnchorPoint = Vector2.new(1, 0.5)
+    display.Size = UDim2.fromOffset(120, 20)
+    display.Position = UDim2.new(1, 0, 0.5, 0)
+    display.BackgroundColor3 = Theme.bg_row
+    display.BorderSizePixel = 0
+    display.Font = Font.bold
+    display.TextSize = 10
+    display.TextColor3 = Theme.text
+    display.Text = "..."
+    display.Parent = row
+    Utils.corner(display, 5)
+
+    local popup = Instance.new("Frame")
+    popup.Size = UDim2.fromOffset(120, 0)
+    popup.BackgroundColor3 = Theme.bg_alt
+    popup.BorderSizePixel = 0
+    popup.Visible = false
+    popup.ZIndex = 20
+    popup.AutomaticSize = Enum.AutomaticSize.Y
+    popup.Parent = self.Frame.Parent
+    Utils.corner(popup, 6)
+    Utils.stroke(popup, Theme.accent, 1, 0.5)
+
+    local popupLayout = Instance.new("UIListLayout")
+    popupLayout.Padding = UDim.new(0, 2)
+    popupLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    popupLayout.Parent = popup
+
+    local popupPad = Instance.new("UIPadding")
+    popupPad.PaddingTop = UDim.new(0, 4)
+    popupPad.PaddingBottom = UDim.new(0, 4)
+    popupPad.PaddingLeft = UDim.new(0, 4)
+    popupPad.PaddingRight = UDim.new(0, 4)
+    popupPad.Parent = popup
+
+    Popups[#Popups + 1] = popup
+
+    local selected = {}
+    local widget = { Options = props.options, Selected = selected }
+
+    local function refreshDisplay()
+        if props.multi then
+            local count = 0
+            for _ in pairs(selected) do count = count + 1 end
+            display.Text = count > 0 and ("выбрано: " .. count) or "..."
+        else
+            for key in pairs(selected) do
+                display.Text = tostring(key)
+            end
+        end
+    end
+
+    local function buildOptions()
+        for _, option in ipairs(props.options) do
+            local optionButton = Instance.new("TextButton")
+            optionButton.Size = UDim2.new(1, 0, 0, 20)
+            optionButton.BackgroundColor3 = Theme.bg_row
+            optionButton.BackgroundTransparency = 0.5
+            optionButton.BorderSizePixel = 0
+            optionButton.Font = Font.med
+            optionButton.TextSize = 10
+            optionButton.TextColor3 = Theme.text_dim
+            optionButton.Text = tostring(option)
+            optionButton.ZIndex = 21
+            optionButton.Parent = popup
+            Utils.corner(optionButton, 4)
+
+            local function paint()
+                local active = selected[option] == true
+                Utils.tween(optionButton, 0.12, {
+                    BackgroundColor3 = active and Theme.accent_dim or Theme.bg_row,
+                    TextColor3 = active and Theme.text or Theme.text_dim,
+                })
+            end
+
+            optionButton.MouseButton1Click:Connect(function()
+                if props.multi then
+                    selected[option] = not selected[option] or nil
+                else
+                    table.clear(selected)
+                    selected[option] = true
+                    closeAllPopups()
+                end
+                paint()
+                refreshDisplay()
+                if props.flag then
+                    local list = {}
+                    for key in pairs(selected) do
+                        list[#list + 1] = key
+                    end
+                    Config[props.flag] = props.multi and list or list[1]
+                end
+                if props.callback then
+                    props.callback(selected)
+                end
+            end)
+
+            if props.default then
+                if type(props.default) == "table" then
+                    if props.default[option] then selected[option] = true end
+                elseif props.default == option then
+                    selected[option] = true
+                end
+            end
+
+            paint()
+        end
+        refreshDisplay()
+    end
+
+    buildOptions()
+
+    display.MouseButton1Click:Connect(function()
+        local showing = not popup.Visible
+        closeAllPopups(popup)
+        popup.Visible = showing
+        if showing then
+            popup.Position = UDim2.new(
+                0,
+                display.AbsolutePosition.X - self.Frame.AbsolutePosition.X + self.Frame.Parent.AbsolutePosition.X,
+                0,
+                display.AbsolutePosition.Y + display.AbsoluteSize.Y + 2
+            )
+        end
+    end)
+
+    self.Widgets[#self.Widgets + 1] = widget
+    return widget
+end
+
+--───────────────────────────────────────────────────────────── textbox
+
+function UI:Textbox(props)
+    local row = self:Row(28)
+    self:RowLabel(row, props.text)
+
+    local box = Instance.new("TextBox")
+    box.AnchorPoint = Vector2.new(1, 0.5)
+    box.Size = UDim2.fromOffset(120, 20)
+    box.Position = UDim2.new(1, 0, 0.5, 0)
+    box.BackgroundColor3 = Theme.bg_row
+    box.BorderSizePixel = 0
+    box.Font = Font.med
+    box.TextSize = 10
+    box.TextColor3 = Theme.text
+    box.PlaceholderText = props.placeholder or ""
+    box.PlaceholderColor3 = Theme.text_faint
+    box.Text = tostring(props.default or "")
+    box.ClearTextOnFocus = false
+    box.Parent = row
+    Utils.corner(box, 5)
+
+    if props.flag then
+        Config[props.flag] = props.default
+    end
+
+    box.FocusLost:Connect(function()
+        if props.flag then
+            Config[props.flag] = box.Text
+        end
+        if props.callback then
+            props.callback(box.Text)
+        end
+    end)
+
+    return box
+end
+
+--────────────────────────────────────────────────────────────── button
+
+function UI:Button(props)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 24)
+    button.BackgroundColor3 = Theme.bg_row
+    button.BackgroundTransparency = 0.3
+    button.BorderSizePixel = 0
+    button.Font = Font.bold
+    button.TextSize = 11
+    button.TextColor3 = Theme.text
+    button.Text = props.text or "button"
+    button.Parent = self.Body
+    Utils.corner(button, 6)
+
+    button.MouseEnter:Connect(function()
+        Utils.tween(button, 0.12, {BackgroundColor3 = Theme.bg_hover, BackgroundTransparency = 0})
+    end)
+    button.MouseLeave:Connect(function()
+        Utils.tween(button, 0.12, {BackgroundColor3 = Theme.bg_row, BackgroundTransparency = 0.3})
+    end)
+    button.MouseButton1Click:Connect(function()
+        local scale = button:FindFirstChildOfClass("UIScale")
+        if not scale then
+            scale = Instance.new("UIScale")
+            scale.Parent = button
+        end
+        scale.Scale = 0.94
+        Utils.tween(scale, 0.18, {Scale = 1}, Enum.EasingStyle.Back)
+        if props.callback then
+            props.callback()
+        end
+    end)
+
+    return button
+end
+
+--───────────────────────────────────────────────────────────── keybind
+
+local KeybindRegistry = {}
+
+function UI:Keybind(props)
+    local row = self:Row(26)
+    self:RowLabel(row, props.text)
+
+    local button = Instance.new("TextButton")
+    button.AnchorPoint = Vector2.new(1, 0.5)
+    button.Size = UDim2.fromOffset(90, 20)
+    button.Position = UDim2.new(1, 0, 0.5, 0)
+    button.BackgroundColor3 = Theme.bg_row
+    button.BorderSizePixel = 0
+    button.Font = Font.bold
+    button.TextSize = 10
+    button.TextColor3 = Theme.text
+    button.Text = props.default or "None"
+    button.Parent = row
+    Utils.corner(button, 5)
+
+    if props.flag then
+        Config[props.flag] = props.default
+    end
+
+    local listening = false
+    local widget = { Key = props.default, Callback = props.callback, Text = props.text }
+
+    local function setKey(key)
+        widget.Key = key
+        button.Text = key or "None"
+        if props.flag then
+            Config[props.flag] = key
+        end
+    end
+
+    button.MouseButton1Click:Connect(function()
+        listening = true
+        button.Text = "..."
+    end)
+
+    RootMaid:Give(UserInput.InputBegan:Connect(function(input, processed)
+        if listening then
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                listening = false
+                setKey(input.KeyCode.Name)
+                button.TextColor3 = Theme.accent
+                task.delay(0.15, function()
+                    button.TextColor3 = Theme.text
+                end)
+            end
+            return
+        end
+
+        if processed then return end
+        if not widget.Key or widget.Key == "None" then return end
+        if input.KeyCode.Name ~= widget.Key then return end
+        if widget.Callback then
+            widget.Callback()
+        end
+    end))
+
+    setKey(props.default)
+    KeybindRegistry[#KeybindRegistry + 1] = widget
+    return widget
+end
+
+--────────────────────────────────────────────────────────────── label
+
+function UI:Label(props)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, props.height or 16)
+    label.BackgroundTransparency = 1
+    label.Font = Font.reg
+    label.TextSize = 10
+    label.TextWrapped = true
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextYAlignment = Enum.TextYAlignment.Top
+    label.TextColor3 = props.color or Theme.text_faint
+    label.Text = props.text or ""
+    label.Parent = self.Body
+    return label
+end
+
+function UI:Divider()
+    local divider = Instance.new("Frame")
+    divider.Size = UDim2.new(1, 0, 0, 1)
+    divider.BackgroundColor3 = Theme.stroke
+    divider.BackgroundTransparency = 0.5
+    divider.BorderSizePixel = 0
+    divider.Parent = self.Body
+    return divider
+end
+
+--───────────────────────────────────────────────────────── colorpicker
+
+function UI:Colorpicker(props)
+    local row = self:Row(26)
+    self:RowLabel(row, props.text)
+
+    local swatch = Instance.new("TextButton")
+    swatch.AnchorPoint = Vector2.new(1, 0.5)
+    swatch.Size = UDim2.fromOffset(56, 20)
+    swatch.Position = UDim2.new(1, 0, 0.5, 0)
+    swatch.BackgroundColor3 = props.default or Theme.accent
+    swatch.BorderSizePixel = 0
+    swatch.Text = ""
+    swatch.Parent = row
+    Utils.corner(swatch, 5)
+
+    local popup = Instance.new("Frame")
+    popup.Size = UDim2.fromOffset(160, 96)
+    popup.BackgroundColor3 = Theme.bg_alt
+    popup.BorderSizePixel = 0
+    popup.Visible = false
+    popup.ZIndex = 20
+    popup.Parent = self.Frame.Parent
+    Utils.corner(popup, 6)
+    Utils.stroke(popup, Theme.accent, 1, 0.5)
+    Popups[#Popups + 1] = popup
+
+    local color = props.default or Theme.accent
+    local widget = { Value = color }
+
+    local function apply()
+        swatch.BackgroundColor3 = color
+        widget.Value = color
+        if props.flag then
+            Config[props.flag] = color
+        end
+        if props.callback then
+            props.callback(color)
+        end
+    end
+
+    local function channelSlider(name, getter, setter, offset)
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.fromOffset(16, 16)
+        label.Position = UDim2.fromOffset(8, offset)
+        label.BackgroundTransparency = 1
+        label.Font = Font.bold
+        label.TextSize = 10
+        label.TextColor3 = Theme.text_dim
+        label.Text = name
+        label.ZIndex = 21
+        label.Parent = popup
+
+        local track = Instance.new("TextButton")
+        track.Size = UDim2.fromOffset(120, 6)
+        track.Position = UDim2.fromOffset(28, offset + 5)
+        track.BackgroundColor3 = Theme.bg_row
+        track.BorderSizePixel = 0
+        track.Text = ""
+        track.ZIndex = 21
+        track.Parent = popup
+        Utils.corner(track, 3)
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new(getter() / 255, 0, 1, 0)
+        fill.BackgroundColor3 = Theme.accent
+        fill.BorderSizePixel = 0
+        fill.ZIndex = 22
+        fill.Parent = track
+        Utils.corner(fill, 3)
+
+        local dragging = false
+        local function fromInput(input)
+            local relative = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
+            local value = math.floor(Utils.clamp(relative, 0, 1) * 255 + 0.5)
+            setter(value)
+            fill.Size = UDim2.new(value / 255, 0, 1, 0)
+            apply()
+        end
+
+        track.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                fromInput(input)
+            end
+        end)
+        UserInput.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch) then
+                fromInput(input)
+            end
+        end)
+        UserInput.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+    end
+
+    local r, g, b = color.R * 255, color.G * 255, color.B * 255
+    channelSlider("R", function() return r end, function(v) r = v end, 6)
+    channelSlider("G", function() return g end, function(v) g = v end, 34)
+    channelSlider("B", function() return b end, function(v) b = v end, 62)
+
+    swatch.MouseButton1Click:Connect(function()
+        local showing = not popup.Visible
+        closeAllPopups(popup)
+        popup.Visible = showing
+        if showing then
+            popup.Position = UDim2.fromOffset(
+                swatch.AbsolutePosition.X - 100,
+                swatch.AbsolutePosition.Y + 22
+            )
+        end
+    end)
+
+    apply()
+    self.Widgets[#self.Widgets + 1] = widget
+    return widget
+end
+
+--───────────────────────────────────────────────────────── player list
+
+function UI:PlayerList(height)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, height or 180)
+    container.BackgroundColor3 = Theme.bg_alt
+    container.BackgroundTransparency = 0.4
+    container.BorderSizePixel = 0
+    container.Parent = self.Body
+    Utils.corner(container, 8)
+    Utils.pad(container, 6, 6, 6, 6)
+
+    local search = Instance.new("TextBox")
+    search.Size = UDim2.new(1, 0, 0, 22)
+    search.BackgroundColor3 = Theme.bg_row
+    search.BorderSizePixel = 0
+    search.Font = Font.med
+    search.TextSize = 10
+    search.TextColor3 = Theme.text
+    search.PlaceholderText = "поиск..."
+    search.PlaceholderColor3 = Theme.text_faint
+    search.Text = ""
+    search.ClearTextOnFocus = false
+    search.Parent = container
+    Utils.corner(search, 5)
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, 0, 1, -28)
+    scroll.Position = UDim2.new(0, 0, 0, 26)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 3
+    scroll.ScrollBarImageColor3 = Theme.accent
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.Parent = container
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 3)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
+    end)
+
+    local rows = {}
+    local api = { Container = container, Scroll = scroll, Rows = rows }
+
+    function api.Rebuild()
+        for _, row in ipairs(rows) do
+            row.Frame:Destroy()
+        end
+        table.clear(rows)
+
+        local filter = search.Text:lower()
+        local myRoot = Entity.Root()
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                if filter == "" or player.Name:lower():find(filter, 1, true) then
+                    local rowFrame = Instance.new("TextButton")
+                    rowFrame.Size = UDim2.new(1, -6, 0, 22)
+                    rowFrame.BackgroundColor3 = Theme.bg_row
+                    rowFrame.BackgroundTransparency = 0.4
+                    rowFrame.BorderSizePixel = 0
+                    rowFrame.Font = Font.med
+                    rowFrame.TextSize = 10
+                    rowFrame.TextColor3 = Theme.text
+                    rowFrame.TextXAlignment = Enum.TextXAlignment.Left
+                    rowFrame.Text = "  " .. player.Name
+                    rowFrame.Parent = scroll
+                    Utils.corner(rowFrame, 5)
+
+                    local record = { Frame = rowFrame, Player = player }
+                    rows[#rows + 1] = record
+
+                    rowFrame.MouseButton1Click:Connect(function()
+                        Config.PriorityTarget = player
+                        Notify.Push("target: " .. player.Name, "success")
+                    end)
+                    rowFrame.MouseButton2Click:Connect(function()
+                        Social.TeleportTo(player)
+                    end)
+
+                    task.spawn(function()
+                        while Runtime.Running and rowFrame.Parent do
+                            task.wait(0.4)
+                            local ok, humanoid, root = Entity.IsAlive(player)
+                            if ok and myRoot then
+                                local distance = (root.Position - myRoot.Position).Magnitude
+                                rowFrame.Text = string.format("  %s   %d hp   %dm",
+                                    player.Name, math.floor(humanoid.Health), math.floor(distance))
+                                rowFrame.TextColor3 = Config.PriorityTarget == player and Theme.accent or Theme.text
+                            else
+                                rowFrame.Text = "  " .. player.Name .. "   dead"
+                                rowFrame.TextColor3 = Theme.text_faint
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end
+
+    search:GetPropertyChangedSignal("Text"):Connect(function()
+        api.Rebuild()
+    end)
+
+    api.Rebuild()
+    return api
+end
+
+--───────────────────────────────────────────────────────────── keybinds tab
+
+function UI:KeybindList(height)
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, 0, 0, height or 200)
+    scroll.BackgroundColor3 = Theme.bg_alt
+    scroll.BackgroundTransparency = 0.4
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 3
+    scroll.ScrollBarImageColor3 = Theme.accent
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.Parent = self.Body
+    Utils.corner(scroll, 8)
+    Utils.pad(scroll, 6, 6, 6, 6)
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 3)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
+
+    local rows = {}
+
+    local function rebuild()
+        for _, row in ipairs(rows) do row:Destroy() end
+        table.clear(rows)
+
+        for _, entry in ipairs(KeybindRegistry) do
+            local row = Instance.new("TextLabel")
+            row.Size = UDim2.new(1, -6, 0, 20)
+            row.BackgroundColor3 = Theme.bg_row
+            row.BackgroundTransparency = 0.4
+            row.BorderSizePixel = 0
+            row.Font = Font.med
+            row.TextSize = 10
+            row.TextColor3 = Theme.text_dim
+            row.TextXAlignment = Enum.TextXAlignment.Left
+            row.Text = "  " .. (entry.Text or "?") .. "   —   " .. tostring(entry.Key)
+            row.Parent = scroll
+            Utils.corner(row, 5)
+            rows[#rows + 1] = row
+        end
+
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() end)
+        scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
+    end
+
+    rebuild()
+    return { Rebuild = rebuild }
+end
+
+--────────────────────────────────────────────────────────────────── window
+
+Window = UI.new({
+    title = "HOLY MOLY! FARM",
+    subtitle = "MADE BY ZED  ·  v" .. Runtime.Version,
+    width = 620,
+    height = 424,
+})
+
+local CombatTab = Window:SelectTab and "Combat" or "Combat"
+
+--═══════════════════════════════════════════════════════ TAB: COMBAT ══
+
+do
+    local section = Window:Section("Combat", "TARGETING")
+
+    section:Dropdown({
+        text = "Режим выбора",
+        options = {"LowestHP", "Nearest", "Farthest", "HighestHP"},
+        default = Config.Mode,
+        callback = function(selected)
+            for key in pairs(selected) do
+                Config.Mode = key
+            end
+        end,
+    })
+
+    section:Slider({
+        text = "Радиус",
+        min = 10,
+        max = 300,
+        default = Config.Range,
+        integer = true,
+        flag = "Range",
+    })
+
+    section:Toggle({text = "Игнор сейф-зон", flag = "SafeZoneFilter", default = true})
+    section:Toggle({text = "Игнор спавн-иммунитета", flag = "ImmunityFilter", default = true})
+    section:Toggle({text = "Друзья в вайтлисте", flag = "FriendsWhitelist", default = true})
+    section:Toggle({text = "Проверка прямой видимости", flag = "LOSCheck", default = true})
+    section:Button({text = "Сбросить приоритетную цель", callback = function()
+        Config.PriorityTarget = nil
+        Notify.Push("приоритет сброшен", "info")
+    end})
+end
+
+do
+    local section = Window:Section("Combat", "AUTO COMBO")
+
+    section:Toggle({text = "Авто-комбо", flag = "AutoCombo", default = true})
+    section:Toggle({text = "Авто M1", flag = "AutoM1", default = true})
+    section:Toggle({text = "M1 Reach", flag = "Reach", default = true})
+    section:Toggle({text = "Endlag Cancel", flag = "EndlagCancel", default = true})
+    section:Toggle({text = "Бесконечное комбо", flag = "ComboInfinite", default = false})
+
+    section:Slider({
+        text = "Задержка M1",
+        min = 0.03,
+        max = 0.3,
+        default = Config.M1Delay,
+        decimals = 2,
+        flag = "M1Delay",
+    })
+
+    section:Slider({
+        text = "Ударов до сброса",
+        min = 1,
+        max = 8,
+        default = Config.ComboHits,
+        integer = true,
+        flag = "ComboHits",
+    })
+
+    section:Slider({
+        text = "Пауза сброса комбо",
+        min = 0.05,
+        max = 1,
+        default = Config.ComboReset,
+        decimals = 2,
+        flag = "ComboReset",
+    })
+
+    section:Slider({
+        text = "Джиттер таймингов",
+        min = 0,
+        max = 1,
+        default = Config.M1Jitter,
+        decimals = 2,
+        flag = "M1Jitter",
+    })
+end
+
+do
+    local section = Window:Section("Combat", "SKILLS & FEEDER")
+
+    section:Toggle({text = "Авто-скиллы", flag = "AutoSkill", default = true})
+    section:Toggle({text = "Combo Feeder", flag = "ComboFeeder", default = true})
+    section:Toggle({text = "Feeder по рагдоллу", flag = "FeederOnRagdoll", default = true})
+    section:Toggle({text = "Feeder по стану", flag = "FeederOnStun", default = true})
+    section:Toggle({text = "Guard break по блоку", flag = "GuardBreakOnBlock", default = true})
+
+    section:Slider({
+        text = "Задержка скиллов",
+        min = 0.3,
+        max = 6,
+        default = Config.SkillDelay,
+        decimals = 2,
+        flag = "SkillDelay",
+    })
+
+    section:Slider({
+        text = "Задержка фидера",
+        min = 0.03,
+        max = 0.6,
+        default = Config.FeederDelay,
+        decimals = 2,
+        flag = "FeederDelay",
+    })
+
+    section:Textbox({text = "Клавиши скиллов", default = "E,R,T", callback = function(text)
+        local keys = {}
+        for key in text:gmatch("[^,%s]+") do
+            keys[#keys + 1] = key:upper()
+        end
+        if #keys > 0 then
+            Config.SkillKeys = keys
+            Notify.Push("скиллы: " .. table.concat(keys, " "), "info")
+        end
+    end})
+
+    section:Textbox({text = "Клавиши фидера", default = "E,R,T,Y", callback = function(text)
+        local keys = {}
+        for key in text:gmatch("[^,%s]+") do
+            keys[#keys + 1] = key:upper()
+        end
+        if #keys > 0 then
+            Config.FeederKeys = keys
+        end
+    end})
+end
+
+do
+    local section = Window:Section("Combat", "DEFENSE")
+
+    section:Toggle({text = "Авто-додж", flag = "AutoDodge", default = true})
+    section:Toggle({text = "Авто-блок", flag = "AutoBlock", default = false})
+    section:Toggle({text = "Авто-контр", flag = "AutoCounter", default = false})
+    section:Toggle({text = "Авто-дэш на сближение", flag = "AutoDash", default = true})
+    section:Toggle({text = "Auto Tech (направленный дэш)", flag = "AutoTech", default = true})
+    section:Toggle({text = "Авто-пробуждение", flag = "Awaken", default = true})
+
+    section:Keybind({text = "Клавиша блока", default = Config.BlockKey, flag = "BlockKey"})
+    section:Keybind({text = "Клавиша дэша", default = Config.DashKey, flag = "DashKey"})
+    section:Keybind({text = "Клавиша контр-атаки", default = Config.CounterKey, flag = "CounterKey"})
+    section:Keybind({text = "Клавиша пробуждения", default = Config.AwakenKey, flag = "AwakenKey"})
+end
+
+do
+    local section = Window:Section("Combat", "GIMMICKS")
+
+    section:Toggle({text = "Wall Combo Anywhere", flag = "WallCombo", default = false})
+    section:Toggle({text = "Hitbox x2", callback = function() end, flag = nil, default = false})
+
+    section:Slider({
+        text = "Hitbox Scale",
+        min = 1,
+        max = 6,
+        default = Config.HitboxScale,
+        decimals = 1,
+        flag = "HitboxScale",
+    })
+
+    section:Slider({
+        text = "Silent Aim (raycast hook)",
+        min = 0,
+        max = 1,
+        default = 0,
+        decimals = 0,
+        callback = function() end,
+    })
+
+    section:Toggle({text = "Silent Aim", flag = "SilentAim", default = false})
+    section:Toggle({text = "Remote Mode", flag = "RemoteMode", default = false})
+    section:Toggle({text = "Remote Log", flag = "RemoteLog", default = false})
+
+    section:Textbox({text = "Имя RemoteEvent", default = Config.RemoteName, flag = "RemoteName",
+        placeholder = "напр. MoveReplication"})
+
+    section:Dropdown({
+        text = "Аргумент ремоута",
+        options = {"none", "player", "char", "hrp", "pos"},
+        default = Config.RemoteArg,
+        callback = function(selected)
+            for key in pairs(selected) do
+                Config.RemoteArg = key
+            end
+        end,
+    })
+end
+
+--═════════════════════════════════════════════════════ TAB: MOVEMENT ══
+
+do
+    local section = Window:Section("Movement", "POSITIONING")
+
+    section:Dropdown({
+        text = "Режим прилипания",
+        options = {"Physics", "Hard", "None"},
+        default = Config.StickMode,
+        callback = function(selected)
+            for key in pairs(selected) do
+                Config.StickMode = key
+            end
+        end,
+    })
+
+    section:Dropdown({
+        text = "Точка прилипания",
+        options = {"Behind", "Front", "Side", "Above"},
+        default = Config.StickPos,
+        callback = function(selected)
+            for key in pairs(selected) do
+                Config.StickPos = key
+            end
+        end,
+    })
+
+    section:Slider({
+        text = "Дистанция прилипания",
+        min = 1,
+        max = 12,
+        default = Config.StickOffset,
+        decimals = 1,
+        flag = "StickOffset",
+    })
+
+    section:Slider({
+        text = "Высота",
+        min = -4,
+        max = 8,
+        default = Config.StickHeight,
+        decimals = 1,
+        flag = "StickHeight",
+    })
+
+    section:Slider({
+        text = "Отзывчивость AlignPosition",
+        min = 20,
+        max = 500,
+        default = Config.AlignResponsiveness,
+        integer = true,
+        flag = "AlignResponsiveness",
+    })
+
+    section:Slider({
+        text = "MaxVelocity (0 = без лимита)",
+        min = 0,
+        max = 800,
+        default = Config.AlignMaxVelocity,
+        integer = true,
+        flag = "AlignMaxVelocity",
+    })
+
+    section:Toggle({text = "Гасить инерцию (Hard)", flag = "HardKillVelocity", default = true})
+    section:Toggle({text = "Блокировать ввод движения", flag = "FreezeMove", default = true})
+    section:Toggle({text = "Авто-бег к цели (None)", flag = "AutoWalk", default = true})
+end
+
+do
+    local section = Window:Section("Movement", "PREDICTION")
+
+    section:Slider({
+        text = "Множитель предикта",
+        min = 0,
+        max = 3,
+        default = Config.Prediction,
+        decimals = 2,
+        flag = "Prediction",
+    })
+
+    section:Slider({
+        text = "Максимальный лид (сек)",
+        min = 0.02,
+        max = 0.6,
+        default = Config.MaxLead,
+        decimals = 2,
+        flag = "MaxLead",
+    })
+
+    section:Toggle({text = "Лок камеры", flag = "LockCam", default = true})
+
+    section:Dropdown({
+        text = "Точка прицела",
+        options = {"HumanoidRootPart", "Head", "UpperTorso"},
+        default = Config.AimPart,
+        callback = function(selected)
+            for key in pairs(selected) do
+                Config.AimPart = key
+            end
+        end,
+    })
+end
+
+do
+    local section = Window:Section("Movement", "TRAVERSAL")
+
+    section:Toggle({text = "Fly", flag = "Fly", default = false})
+    section:Toggle({text = "Noclip", flag = "Noclip", default = false})
+    section:Toggle({text = "Infinite Jump", flag = "InfiniteJump", default = false})
+    section:Toggle({text = "No Fatigue", flag = "NoFatigue", default = true})
+
+    section:Slider({
+        text = "Fly Speed",
+        min = 10,
+        max = 400,
+        default = Config.FlySpeed,
+        integer = true,
+        flag = "FlySpeed",
+    })
+
+    section:Slider({
+        text = "WalkSpeed (0 = дефолт)",
+        min = 0,
+        max = 200,
+        default = Config.WalkSpeed,
+        integer = true,
+        flag = "WalkSpeed",
+    })
+
+    section:Button({text = "Server Hop", callback = function()
+        Notify.Push("ищу сервер...", "info")
+        Social.ServerHop()
+    end})
+end
+
+--════════════════════════════════════════════════════════ TAB: VISUALS ══
+
+do
+    local section = Window:Section("Visuals", "ESP")
+
+    section:Toggle({text = "ESP", flag = "ESP", default = false})
+    section:Toggle({text = "Боксы", flag = "ESPBox", default = true})
+    section:Toggle({text = "Хелсбары", flag = "ESPHealth", default = true})
+    section:Toggle({text = "Ники", flag = "ESPName", default = true})
+    section:Toggle({text = "Дистанция", flag = "ESPDistance", default = true})
+    section:Toggle({text = "Трейсеры", flag = "ESPTracer", default = true})
+    section:Toggle({text = "Chams (Highlight)", flag = "ESPChams", default = false})
+    section:Toggle({text = "Круг радиуса", flag = "ReachCircle", default = true})
+
+    section:Slider({
+        text = "Дальность отрисовки",
+        min = 50,
+        max = 1000,
+        default = Config.DrawRange,
+        integer = true,
+        flag = "DrawRange",
+    })
+end
+
+do
+    local section = Window:Section("Visuals", "PERFORMANCE")
+
+    section:Toggle({text = "VFX Cull", flag = "VFXCull", default = false})
+    section:Toggle({text = "Lighting Cull", flag = "LightingCull", default = true})
+
+    section:Slider({
+        text = "Частота чистки",
+        min = 0.5,
+        max = 10,
+        default = Config.CullRate,
+        decimals = 1,
+        flag = "CullRate",
+    })
+
+    section:Slider({
+        text = "Скорость анимаций",
+        min = 0.5,
+        max = 3,
+        default = Config.AnimSpeed,
+        decimals = 2,
+        flag = "AnimSpeed",
+    })
+
+    section:Toggle({text = "Watermark", flag = "Watermark", default = true})
+end
+
+--════════════════════════════════════════════════════════ TAB: PLAYERS ══
+
+do
+    local section = Window:Section("Players", "СПИСОК")
+    section:Label({
+        text = "ЛКМ — сделать приоритетной целью.  ПКМ — телепорт к игроку.",
+        height = 14,
+    })
+    section.PlayerList(210)
+end
+
+do
+    local section = Window:Section("Players", "ДЕЙСТВИЯ")
+
+    section:Textbox({
+        text = "Ник для вайтлиста",
+        placeholder = "введи ник",
+        callback = function(text)
+            if text ~= "" then
+                Config.Whitelist[text] = true
+                Notify.Push("вайтлист: " .. text, "success")
+            end
+        end,
+    })
+
+    section:Button({text = "Очистить вайтлист", callback = function()
+        table.clear(Config.Whitelist)
+        Notify.Push("вайтлист очищен", "info")
+    end})
+
+    section:Button({text = "Телепорт к приоритетной цели", callback = function()
+        if Config.PriorityTarget then
+            Social.TeleportTo(Config.PriorityTarget)
+        end
+    end})
+
+    section:Button({text = "Телепорт за спину цели", callback = function()
+        if Config.PriorityTarget then
+            Social.TeleportBehind(Config.PriorityTarget)
+        end
+    end})
+end
+
+--═══════════════════════════════════════════════════════════ TAB: MISC ══
+
+do
+    local section = Window:Section("Misc", "СТАТУС")
+
+    section:Label({text = "Версия: " .. Runtime.Version .. "   |   MADE BY ZED", height = 14})
+    section:Label({text = "Hook: " .. tostring(Runtime.HookInstalled), height = 14})
+    section:Label({text = "Аптайм обновляется в watermark.", height = 14})
+end
+
+do
+    local section = Window:Section("Misc", "СОЦИАЛКА")
+
+    section:Toggle({text = "Toxic после килла", flag = "Toxic", default = false})
+    section:Toggle({text = "Анти-AFK", flag = "AutoAFK", default = true})
+
+    section:Textbox({text = "Фразы (через запятую)", default = table.concat(Config.ToxicMsgs, ", "),
+        callback = function(text)
+            local messages = {}
+            for message in text:gmatch("[^,]+") do
+                local trimmed = message:match("^%s*(.-)%s*$")
+                if trimmed ~= "" then
+                    messages[#messages + 1] = trimmed
+                end
+            end
+            if #messages > 0 then
+                Config.ToxicMsgs = messages
+            end
+        end})
+
+    section:Button({text = "Сказать EZ", callback = function()
+        Social.Say("EZ")
+    end})
+end
+
+do
+    local section = Window:Section("Misc", "АНТИЧИТ И СТАФФ")
+
+    section:Toggle({text = "Анти-рагдолл", flag = "AntiRagdoll", default = true})
+    section:Toggle({text = "Анти-стан", flag = "AntiStun", default = true})
+    section:Toggle({text = "Анти-флинг", flag = "AntiFling", default = true})
+    section:Toggle({text = "Анти-войд", flag = "AntiVoid", default = false})
+    section:Toggle({text = "Авто-респавн", flag = "AutoRespawn", default = true})
+
+    section:Dropdown({
+        text = "При заходе стаффа",
+        options = {"Notify", "Hop", "Shutdown"},
+        default = Config.OnStaff,
+        callback = function(selected)
+            for key in pairs(selected) do
+                Config.OnStaff = key
+            end
+        end,
+    })
+
+    section:Slider({
+        text = "Staff Group ID (0 = выкл)",
+        min = 0,
+        max = 99999999,
+        default = Config.StaffGroup,
+        integer = true,
+        flag = "StaffGroup",
+    })
+
+    section:Slider({
+        text = "Сброс стрика на",
+        min = 0,
+        max = 50,
+        default = Config.ResetStreakAt,
+        integer = true,
+        flag = "ResetStreakAt",
+    })
+end
+
+do
+    local section = Window:Section("Misc", "КОНФИГ")
+
+    section:Slider({
+        text = "Слот конфига",
+        min = 1,
+        max = 5,
+        default = Config.ActiveSlot,
+        integer = true,
+        flag = "ActiveSlot",
+    })
+
+    section:Button({text = "Сохранить в слот", callback = function()
+        Config.SaveConfig = true
+        ConfigManager.Save(Config.ActiveSlot)
+        Notify.Push("сохранено в слот " .. Config.ActiveSlot, "success")
+    end})
+
+    section:Button({text = "Загрузить из слота", callback = function()
+        ConfigManager.Load(Config.ActiveSlot)
+        Notify.Push("загружено из слота " .. Config.ActiveSlot, "success")
+    end})
+
+    section:Button({text = "Удалить слот", callback = function()
+        ConfigManager.Delete(Config.ActiveSlot)
+        Notify.Push("слот " .. Config.ActiveSlot .. " удалён", "warn")
+    end})
+end
+
+do
+    local section = Window:Section("Misc", "КЕЙБИНДЫ")
+    section:Label({text = "Все зарегистрированные бинды. Меняются в своих секциях.", height = 14})
+    section:KeybindList(200)
+end
+
+do
+    local section = Window:Section("Misc", "ИНФО")
+
+    section:Keybind({text = "Открыть/скрыть меню", default = Config.MenuKey, flag = "MenuKey",
+        callback = function()
+            Window:SetOpen(not Window.Open)
+        end})
+
+    section:Button({text = "Сплэш заново", callback = function()
+        Menu.Splash()
+    end})
+
+    section:Button({text = "Выгрузить скрипт", callback = function()
+        if getgenv().HM_UNLOAD then
+            getgenv().HM_UNLOAD()
+        end
+    end})
+
+    section:Label({text = "F2 — фарм, F3 — режим, F4 — стик, F8 — стоп, F11 — сейв.", height = 14})
+end
+
+--═══════════════════════════════════════════════════════════════ CONFIG ══
+
+local ConfigManager = {}
+
+function ConfigManager.Path(slot)
+    return string.format(CONFIG_FILE, slot or Config.ActiveSlot)
+end
+
+function ConfigManager.Save(slot)
+    local ok = Utils.safeWrite(ConfigManager.Path(slot), "return " .. Utils.serialize(Config))
+    return ok
+end
+
+function ConfigManager.Load(slot)
+    local contents = Utils.safeRead(ConfigManager.Path(slot))
+    if not contents then return false end
+
+    local chunk = loadstring(contents)
+    if not chunk then return false end
+
+    local ok, data = pcall(chunk)
+    if not ok or type(data) ~= "table" then return false end
+
+    for key, value in pairs(data) do
+        if Config[key] ~= nil then
+            Config[key] = value
+        end
+    end
+
+    return true
+end
+
+function ConfigManager.Delete(slot)
+    if not delfile then return end
+    pcall(function()
+        if isfile and isfile(ConfigManager.Path(slot)) then
+            delfile(ConfigManager.Path(slot))
+        end
+    end)
+end
+
+ConfigManager.Load(Config.ActiveSlot)
+
+--═════════════════════════════════════════════════════════════ MENU GLUE ══
+
+local Menu = {}
+
+function Menu.Splash()
+    pcall(function()
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "HM_Splash"
+        gui.IgnoreGuiInset = true
+        gui.DisplayOrder = 999
+        gui.ResetOnSpawn = false
+        gui.Parent = CoreGui
 
         local holder = Instance.new("Frame")
         holder.AnchorPoint = Vector2.new(0.5, 0.5)
         holder.Position = UDim2.fromScale(0.5, 0.42)
-        holder.Size = UDim2.fromOffset(460, 120)
+        holder.Size = UDim2.fromOffset(480, 130)
         holder.BackgroundTransparency = 1
-        holder.Parent = sg
+        holder.Parent = gui
 
-        local sc = Instance.new("UIScale")
-        sc.Scale = 0.78
-        sc.Parent = holder
+        local scale = Instance.new("UIScale")
+        scale.Scale = 0.78
+        scale.Parent = holder
 
         local title = Instance.new("TextLabel")
         title.AnchorPoint = Vector2.new(0.5, 0.5)
-        title.Position = UDim2.new(0.5, 0, 0, 26)
-        title.Size = UDim2.new(1, 0, 0, 46)
+        title.Position = UDim2.new(0.5, 0, 0, 28)
+        title.Size = UDim2.new(1, 0, 0, 48)
         title.BackgroundTransparency = 1
-        title.Font = Enum.Font.GothamBlack
-        title.TextSize = 40
+        title.Font = Font.black
+        title.TextSize = 42
         title.TextTransparency = 1
-        title.TextColor3 = Color3.fromRGB(255, 105, 200)
+        title.TextColor3 = Theme.accent
         title.Text = "HOLY MOLY! FARM"
         title.Parent = holder
 
+        local gradient = Instance.new("UIGradient")
+        gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Theme.accent),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 240, 252)),
+            ColorSequenceKeypoint.new(1, Theme.accent),
+        })
+        gradient.Parent = title
+
         local line = Instance.new("Frame")
         line.AnchorPoint = Vector2.new(0.5, 0.5)
-        line.Position = UDim2.new(0.5, 0, 0, 58)
-        line.Size = UDim2.new(0.45, 0, 0, 1)
-        line.BackgroundColor3 = Color3.fromRGB(255, 105, 200)
+        line.Position = UDim2.new(0.5, 0, 0, 62)
+        line.Size = UDim2.new(0.42, 0, 0, 1)
+        line.BackgroundColor3 = Theme.accent
         line.BackgroundTransparency = 1
         line.BorderSizePixel = 0
         line.Parent = holder
 
         local by = Instance.new("TextLabel")
         by.AnchorPoint = Vector2.new(0.5, 0.5)
-        by.Position = UDim2.new(0.5, 0, 0, 78)
-        by.Size = UDim2.new(1, 0, 0, 22)
+        by.Position = UDim2.new(0.5, 0, 0, 84)
+        by.Size = UDim2.new(1, 0, 0, 24)
         by.BackgroundTransparency = 1
-        by.Font = Enum.Font.GothamBold
-        by.TextSize = 18
+        by.Font = Font.bold
+        by.TextSize = 19
         by.TextTransparency = 1
-        by.TextColor3 = Color3.fromRGB(240, 240, 250)
+        by.TextColor3 = Color3.fromRGB(242, 242, 250)
         by.Text = "MADE BY ZED"
         by.Parent = holder
 
-        tw(sc, 0.55, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-        tw(title, 0.4, { TextTransparency = 0 })
-        task.delay(0.12, function() tw(line, 0.35, { BackgroundTransparency = 0.35 }) end)
-        task.delay(0.18, function() tw(by, 0.4, { TextTransparency = 0 }) end)
+        Utils.tween(scale, 0.55, {Scale = 1}, Enum.EasingStyle.Back)
+        Utils.tween(title, 0.4, {TextTransparency = 0})
+        task.delay(0.12, function() Utils.tween(line, 0.35, {BackgroundTransparency = 0.35}) end)
+        task.delay(0.18, function() Utils.tween(by, 0.4, {TextTransparency = 0}) end)
 
         task.delay(2.1, function()
-            tw(sc, 0.45, { Scale = 1.18 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-            tw(title, 0.45, { TextTransparency = 1 })
-            tw(by, 0.45, { TextTransparency = 1 })
-            tw(line, 0.45, { BackgroundTransparency = 1 })
-            task.delay(0.55, function() pcall(function() sg:Destroy() end) end)
+            Utils.tween(scale, 0.45, {Scale = 1.18}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            Utils.tween(title, 0.45, {TextTransparency = 1})
+            Utils.tween(by, 0.45, {TextTransparency = 1})
+            Utils.tween(line, 0.45, {BackgroundTransparency = 1})
+            task.delay(0.55, function()
+                pcall(function() gui:Destroy() end)
+            end)
         end)
     end)
-    return ok
 end
 
-local ui = nil
-pcall(function()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "HolyMolyFarm"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.DisplayOrder = 50
-    gui.Parent = game:GetService("CoreGui")
+--═══════════════════════════════════════════════════════════════ WATCHERS ══
 
-    local root = Instance.new("CanvasGroup")
-    root.Name = "Root"
-    root.AnchorPoint = Vector2.new(0, 0)
-    root.Size = UDim2.fromOffset(238, 420)
-    root.Position = UDim2.new(0, 20, 0.13, 0)
-    root.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
-    root.BackgroundTransparency = 0.05
-    root.GroupTransparency = 1
-    root.BorderSizePixel = 0
-    root.Active = true
-    root.Draggable = true
-    root.Visible = false
-    root.Parent = gui
+local Watchers = {}
 
-    local rc = Instance.new("UICorner")
-    rc.CornerRadius = UDim.new(0, 12)
-    rc.Parent = root
+function Watchers.Player(player)
+    SpawnAt[player] = 0
+    FriendCache[player] = nil
 
-    local rs = Instance.new("UIStroke")
-    rs.Color = Color3.fromRGB(255, 92, 190)
-    rs.Thickness = 1.4
-    rs.Transparency = 0.3
-    rs.Parent = root
+    RootMaid:Give(player.CharacterAdded:Connect(function(character)
+        task.spawn(function()
+            Entity.OnCharacter(player, character)
+        end)
+    end))
 
-    local head = Instance.new("TextLabel")
-    head.Size = UDim2.new(1, -52, 0, 24)
-    head.Position = UDim2.new(0, 10, 0, 8)
-    head.BackgroundTransparency = 1
-    head.Font = Enum.Font.GothamBlack
-    head.TextSize = 16
-    head.TextXAlignment = Enum.TextXAlignment.Left
-    head.TextColor3 = Color3.fromRGB(255, 108, 200)
-    head.Text = "HOLY MOLY! FARM"
-    head.Parent = root
+    if player.Character then
+        task.spawn(function()
+            Entity.OnCharacter(player, player.Character)
+        end)
+    end
+end
 
-    local hgrad = Instance.new("UIGradient")
-    hgrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 195)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 240, 252)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 195)),
-    })
-    hgrad.Parent = head
-
-    local sub = Instance.new("TextLabel")
-    sub.Size = UDim2.new(1, -20, 0, 14)
-    sub.Position = UDim2.new(0, 10, 0, 31)
-    sub.BackgroundTransparency = 1
-    sub.Font = Enum.Font.GothamBold
-    sub.TextSize = 11
-    sub.TextXAlignment = Enum.TextXAlignment.Left
-    sub.TextColor3 = Color3.fromRGB(255, 200, 235)
-    sub.Text = "MADE BY ZED"
-    sub.Parent = root
-
-    local stat = Instance.new("TextLabel")
-    stat.Size = UDim2.new(1, -20, 0, 14)
-    stat.Position = UDim2.new(0, 10, 0, 47)
-    stat.BackgroundTransparency = 1
-    stat.Font = Enum.Font.Gotham
-    stat.TextSize = 11
-    stat.TextXAlignment = Enum.TextXAlignment.Left
-    stat.TextColor3 = Color3.fromRGB(190, 190, 205)
-    stat.Text = "idle"
-    stat.Parent = root
-
-    local min = Instance.new("TextButton")
-    min.AnchorPoint = Vector2.new(1, 0)
-    min.Size = UDim2.fromOffset(22, 22)
-    min.Position = UDim2.new(1, -10, 0, 9)
-    min.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
-    min.BorderSizePixel = 0
-    min.Font = Enum.Font.GothamBold
-    min.TextSize = 14
-    min.TextColor3 = Color3.fromRGB(220, 220, 235)
-    min.Text = "–"
-    min.Parent = root
-    local mc = Instance.new("UICorner")
-    mc.CornerRadius = UDim.new(0, 6)
-    mc.Parent = min
-
-    local list = Instance.new("Frame")
-    list.Size = UDim2.new(1, -20, 1, -122)
-    list.Position = UDim2.new(0, 10, 0, 66)
-    list.BackgroundTransparency = 1
-    list.Parent = root
-
-    local grid = Instance.new("UIGridLayout")
-    grid.CellSize = UDim2.new(0.5, -3, 0, 22)
-    grid.CellPadding = UDim2.new(0, 6, 0, 5)
-    grid.SortOrder = Enum.SortOrder.LayoutOrder
-    grid.Parent = list
-
-    local foot = Instance.new("TextLabel")
-    foot.AnchorPoint = Vector2.new(0, 1)
-    foot.Size = UDim2.new(1, -20, 0, 16)
-    foot.Position = UDim2.new(0, 10, 1, -8)
-    foot.BackgroundTransparency = 1
-    foot.Font = Enum.Font.Gotham
-    foot.TextSize = 10
-    foot.TextXAlignment = Enum.TextXAlignment.Left
-    foot.TextColor3 = Color3.fromRGB(130, 130, 148)
-    foot.Text = "baba chai  ·  melstroy  ·  RightShift = menu"
-    foot.Parent = root
-
-    local ON_BG = Color3.fromRGB(152, 44, 112)
-    local OFF_BG = Color3.fromRGB(31, 31, 39)
-    local HOV_BG = Color3.fromRGB(55, 40, 62)
-    local ON_TXT = Color3.fromRGB(255, 236, 250)
-    local OFF_TXT = Color3.fromRGB(175, 175, 190)
-
-    local btns = {}
-
-    local function setBtnVisual(b, on)
-        tw(b, 0.18, {
-            BackgroundColor3 = on and ON_BG or OFF_BG,
-            TextColor3 = on and ON_TXT or OFF_TXT,
-        })
+function Watchers.Install()
+    for _, player in ipairs(Players:GetPlayers()) do
+        Watchers.Player(player)
     end
 
-    local function bounce(b)
-        local s = b:FindFirstChildOfClass("UIScale")
-        if not s then
-            s = Instance.new("UIScale")
-            s.Parent = b
+    RootMaid:Give(Players.PlayerAdded:Connect(function(player)
+        Watchers.Player(player)
+
+        task.wait(3)
+        if not Runtime.Running then return end
+
+        local isStaff = Config.StaffIds[player.UserId] or Config.StaffIds[player.Name]
+
+        if not isStaff and Config.StaffGroup > 0 then
+            local ok, rank = pcall(function()
+                return player:GetRankInGroup(Config.StaffGroup)
+            end)
+            if ok and rank and rank >= 1 then
+                isStaff = true
+            end
         end
-        s.Scale = 0.9
-        tw(s, 0.2, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    end
 
-    local function add(text, get, set)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.fromOffset(100, 22)
-        b.BackgroundColor3 = OFF_BG
-        b.BackgroundTransparency = 1
-        b.TextTransparency = 1
-        b.BorderSizePixel = 0
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 10
-        b.TextColor3 = OFF_TXT
-        b.Text = text
-        b.Parent = list
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 6)
-        c.Parent = b
-
-        local rec = { b = b, get = get, on = false, label = text }
-        btns[#btns + 1] = rec
-
-        b.MouseEnter:Connect(function()
-            if not rec.on then tw(b, 0.12, { BackgroundColor3 = HOV_BG }) end
-        end)
-        b.MouseLeave:Connect(function()
-            if not rec.on then tw(b, 0.12, { BackgroundColor3 = OFF_BG }) end
-        end)
-        b.MouseButton1Click:Connect(function()
-            local v = not get()
-            set(v)
-            rec.on = v
-            setBtnVisual(b, v)
-            bounce(b)
-            if HM.toast then HM.toast(rec.label .. ": " .. (v and "ON" or "OFF"), v) end
-        end)
-        return b
-    end
-
-    add("FARM", function() return CFG.Enabled end, function(v) CFG.Enabled = v end)
-    add("AUTO COMBO [C]", function() return CFG.AutoCombo end, function(v) CFG.AutoCombo = v end)
-    add("AUTO M1", function() return CFG.AutoM1 end, function(v) CFG.AutoM1 = v end)
-    add("REACH", function() return CFG.Reach end, function(v) CFG.Reach = v end)
-    add("ENDLAG CANCEL", function() return CFG.EndlagCancel end, function(v) CFG.EndlagCancel = v end)
-    add("FEEDER", function() return CFG.ComboFeeder end, function(v) CFG.ComboFeeder = v end)
-    add("SKILLS", function() return CFG.AutoSkill end, function(v) CFG.AutoSkill = v end)
-    add("COUNTER", function() return CFG.AutoCounter end, function(v) CFG.AutoCounter = v end)
-    add("DODGE", function() return CFG.AutoDodge end, function(v) CFG.AutoDodge = v end)
-    add("BLOCK", function() return CFG.AutoBlock end, function(v) CFG.AutoBlock = v end)
-    add("AWAKEN", function() return CFG.Awaken end, function(v) CFG.Awaken = v end)
-    add("WALL COMBO", function() return CFG.WallCombo end, function(v) CFG.WallCombo = v end)
-    add("HITBOX x2", function() return CFG.HitboxScale ~= 1 end, function(v) CFG.HitboxScale = v and 2.0 or 1.0 end)
-    add("SILENT AIM", function() return CFG.SilentAim end, function(v) CFG.SilentAim = v end)
-    add("LOS CHECK", function() return CFG.LOSCheck end, function(v) CFG.LOSCheck = v end)
-    add("ESP", function() return CFG.ESP end, function(v) CFG.ESP = v end)
-    add("VFX CULL", function() return CFG.VFXCull end, function(v) CFG.VFXCull = v end)
-    add("TOXIC", function() return CFG.Toxic end, function(v) CFG.Toxic = v end)
-    add("REMOTE LOG", function() return CFG.RemoteLog end, function(v) CFG.RemoteLog = v end)
-    add("ANTI STUN", function() return CFG.AntiStun end, function(v) CFG.AntiStun = v end)
-    local modeBtn = add("MODE", function() return CFG.Mode == "LowestHP" end, function(v) CFG.Mode = v and "LowestHP" or "Nearest" end)
-    local stickBtn = add("STICK", function() return CFG.StickMode ~= "None" end, function(v) CFG.StickMode = v and "Physics" or "None" end)
-
-    local toastHolder = Instance.new("Frame")
-    toastHolder.AnchorPoint = Vector2.new(1, 0)
-    toastHolder.Position = UDim2.new(1, -18, 0, 110)
-    toastHolder.Size = UDim2.fromOffset(210, 400)
-    toastHolder.BackgroundTransparency = 1
-    toastHolder.Parent = gui
-
-    local tl = Instance.new("UIListLayout")
-    tl.Padding = UDim.new(0, 6)
-    tl.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    tl.SortOrder = Enum.SortOrder.LayoutOrder
-    tl.Parent = toastHolder
-
-    local toasts = {}
-
-    function HM.toast(text, on)
-        local f = Instance.new("Frame")
-        f.Size = UDim2.fromOffset(0, 28)
-        f.BackgroundColor3 = on and Color3.fromRGB(60, 18, 44) or Color3.fromRGB(26, 26, 33)
-        f.BackgroundTransparency = 0.1
-        f.BorderSizePixel = 0
-        f.Parent = toastHolder
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 8)
-        c.Parent = f
-        local s = Instance.new("UIStroke")
-        s.Color = on and Color3.fromRGB(255, 105, 200) or Color3.fromRGB(90, 90, 105)
-        s.Thickness = 1
-        s.Transparency = 0.5
-        s.Parent = f
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -16, 1, 0)
-        lbl.Position = UDim2.new(0, 8, 0, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextSize = 11
-        lbl.TextXAlignment = Enum.TextXAlignment.Right
-        lbl.TextTransparency = 1
-        lbl.TextColor3 = on and Color3.fromRGB(255, 220, 245) or Color3.fromRGB(200, 200, 215)
-        lbl.Text = text
-        lbl.Parent = f
-
-        tw(f, 0.25, { Size = UDim2.fromOffset(210, 28) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-        tw(lbl, 0.25, { TextTransparency = 0 })
-        toasts[#toasts + 1] = f
-
-        task.delay(1.7, function()
-            tw(f, 0.28, { Size = UDim2.fromOffset(0, 28), BackgroundTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-            tw(lbl, 0.24, { TextTransparency = 1 })
-            task.delay(0.32, function() pcall(function() f:Destroy() end) end)
-        end)
-    end
-
-    local tab = Instance.new("TextButton")
-    tab.AnchorPoint = Vector2.new(0.5, 0.5)
-    tab.Size = UDim2.fromOffset(40, 40)
-    tab.Position = UDim2.new(0, 42, 0.13, 0)
-    tab.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
-    tab.BackgroundTransparency = 0.05
-    tab.BorderSizePixel = 0
-    tab.Font = Enum.Font.GothamBlack
-    tab.TextSize = 17
-    tab.TextColor3 = Color3.fromRGB(255, 105, 200)
-    tab.Text = "H"
-    tab.Visible = false
-    tab.Parent = gui
-    local tc = Instance.new("UICorner")
-    tc.CornerRadius = UDim.new(1, 0)
-    tc.Parent = tab
-    local ts = Instance.new("UIStroke")
-    ts.Color = Color3.fromRGB(255, 92, 190)
-    ts.Thickness = 1.2
-    ts.Transparency = 0.4
-    ts.Parent = tab
-
-    local MenuOpen = true
-    local HOME = UDim2.new(0, 20, 0.13, 0)
-
-    local function setMenu(open)
-        MenuOpen = open
-        if open then
-            root.Visible = true
-            tab.Visible = false
-            tw(root, 0.38, { GroupTransparency = 0, Position = HOME }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        if isStaff then
+            State.StaffSeen = true
+            if Config.OnStaff == "Shutdown" then
+                pcall(function() game:Shutdown() end)
+            elseif Config.OnStaff == "Hop" then
+                Notify.Push("стафф: " .. player.Name .. " — хопаю", "warn")
+                Social.ServerHop()
+            else
+                Notify.Push("СТАФФ: " .. player.Name, "warn")
+            end
         else
-            tw(root, 0.24, { GroupTransparency = 1, Position = UDim2.new(0, -60, 0.13, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-            task.delay(0.28, function()
-                if not MenuOpen then root.Visible = false end
-            end)
-            task.delay(0.16, function()
-                if not MenuOpen then
-                    tab.Visible = true
-                    tab.Size = UDim2.fromOffset(28, 28)
-                    tw(tab, 0.25, { Size = UDim2.fromOffset(40, 40) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+            task.wait(4)
+            if Runtime.Running and not player.Character and not State.StaffSeen then
+                Notify.Push("возможный спектейтор: " .. player.Name, "info")
+            end
+        end
+    end))
+
+    RootMaid:Give(Players.PlayerRemoving:Connect(function(player)
+        FriendCache[player] = nil
+        IdleIds[player] = nil
+        AnimSeen[player] = nil
+        AttackAt[player] = nil
+        SpawnAt[player] = nil
+
+        if PlayerMaids[player] then
+            PlayerMaids[player]:Clean()
+            PlayerMaids[player] = nil
+        end
+    end))
+end
+
+--═══════════════════════════════════════════════════════════════ LOOPS ══
+
+local Loops = {}
+
+function Loops.Install()
+    Targeting.RefreshSafe()
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(3)
+            Targeting.RefreshSafe()
+        end
+    end)
+
+    RootMaid:Give(workspace.DescendantAdded:Connect(function(instance)
+        if instance:IsA("BasePart") and Config.HitboxScale ~= 1
+            and Visuals.IsHitboxName(instance.Name) then
+            pcall(Visuals.ArmHitbox, instance)
+        end
+
+        if Config.VFXCull then
+            if VFX_CLASSES[instance.ClassName] then
+                instance.Enabled = false
+            end
+            if instance:IsA("Explosion") then
+                instance.Visible = false
+            end
+        end
+    end))
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(Config.HitboxSweep)
+            if Config.HitboxScale ~= 1 then
+                for _, descendant in ipairs(workspace:GetDescendants()) do
+                    if descendant:IsA("BasePart") then
+                        pcall(Visuals.ExpandHitbox, descendant)
+                    end
                 end
-            end)
-        end
-    end
-
-    tab.MouseButton1Click:Connect(function()
-        tab.Visible = false
-        setMenu(true)
-    end)
-    min.MouseButton1Click:Connect(function() setMenu(false) end)
-
-    root.Position = UDim2.new(0, -60, 0.13, 0)
-
-    ui = { stat = stat, root = root, tab = tab }
-
-    task.spawn(function()
-        task.wait(0.15)
-        root.Visible = true
-        tw(root, 0.5, { GroupTransparency = 0, Position = HOME }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-        for _, e in ipairs(btns) do
-            tw(e.b, 0.24, { BackgroundTransparency = 0, TextTransparency = 0 }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-            task.wait(0.017)
+            end
         end
     end)
 
     task.spawn(function()
-        while Running do
+        while Runtime.Running do
+            task.wait(0.12)
+            local myRoot = Entity.Root()
+            if myRoot then
+                local myPosition = myRoot.Position
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer then
+                        local character = player.Character
+                        local humanoid = Entity.HumOf(character)
+                        local root = Entity.RootOf(character)
+                        if humanoid and root
+                            and (root.Position - myPosition).Magnitude <= Config.Range * 1.5 then
+                            local current = {}
+                            local previous = AnimSeen[player] or {}
+                            for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                                local animation = track.Animation
+                                if animation and not Entity.IsIdleAnim(player, animation) then
+                                    current[animation.AnimationId] = true
+                                    if not previous[animation.AnimationId] then
+                                        AttackAt[player] = os.clock()
+                                    end
+                                end
+                            end
+                            AnimSeen[player] = current
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    RootMaid:Give(RunService.Heartbeat:Connect(function()
+        if not Runtime.Running then return end
+
+        if not Config.Enabled then
+            Movement.DropAlign()
+            Movement.DropWall()
+            return
+        end
+
+        local character = Entity.Character()
+        local humanoid = Entity.Humanoid()
+        local ragdolled = (character and humanoid and Entity.IsRagdolled(character, humanoid)) and true or false
+        State.Ragdolled = ragdolled
+
+        if AlignRig then
+            AlignRig.Position.Enabled = not ragdolled
+            AlignRig.Orientation.Enabled = not ragdolled
+        end
+
+        local target = State.Target
+        if not target or not target.Root.Parent then
+            Movement.DropAlign()
+            Movement.DropWall()
+            return
+        end
+
+        if not ragdolled then
+            pcall(Movement.ApplyStick, target)
+        end
+        pcall(Movement.UpdateWall, target)
+
+        if Config.LockCam and not ragdolled then
+            local camera = workspace.CurrentCamera
+            if camera then
+                camera.CFrame = camera.CFrame:Lerp(
+                    CFrame.lookAt(camera.CFrame.Position, Movement.Predict(Entity.AimPoint(target))),
+                    0.5
+                )
+            end
+        end
+    end))
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(0.07)
+            if Config.Enabled then
+                local target = Targeting.Acquire()
+                State.Target = target
+                State.LosClear = (not target) or (not Config.LOSCheck) or Targeting.HasLineOfSight(target)
+            else
+                State.Target = nil
+                State.LosClear = true
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(0.02)
+            if Config.Enabled then
+                local target = State.Target
+                if target and target.Root.Parent and target.Humanoid.Health > 0 then
+                    pcall(Combat.Brain, target)
+                end
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(0.1)
+            local humanoid = Entity.Humanoid()
+            local character = Entity.Character()
+            if humanoid and character then
+                if Config.AntiRagdoll and humanoid.PlatformStand then
+                    pcall(function() humanoid.PlatformStand = false end)
+                end
+
+                if Config.AntiStun then
+                    local st = humanoid:GetState()
+                    if st == Enum.HumanoidStateType.Physics
+                        or st == Enum.HumanoidStateType.FallingDown then
+                        pcall(function()
+                            humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                        end)
+                    end
+                    if humanoid.WalkSpeed < 8 and not humanoid.PlatformStand then
+                        humanoid.WalkSpeed = 16
+                    end
+                end
+
+                if Config.NoFatigue then
+                    humanoid.UseJumpPower = true
+                    if humanoid.JumpPower < Config.JumpPower then
+                        humanoid.JumpPower = Config.JumpPower
+                    end
+                end
+
+                if Config.AntiFling then
+                    local root = Entity.RootOf(character)
+                    if root and root.AssemblyLinearVelocity.Magnitude > 250 then
+                        root.AssemblyLinearVelocity = root.AssemblyLinearVelocity * 0.15
+                    end
+                end
+
+                if Config.AntiVoid and character:GetPivot().Y < -80 then
+                    pcall(function() LocalPlayer:LoadCharacter() end)
+                end
+
+                if Config.WalkSpeed > 0 then
+                    humanoid.WalkSpeed = Config.WalkSpeed
+                end
+
+                if Config.AnimSpeed ~= 1 then
+                    for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                        local animation = track.Animation
+                        if animation and not Entity.IsIdleAnim(LocalPlayer, animation)
+                            and track.Speed ~= Config.AnimSpeed then
+                            track.Speed = Config.AnimSpeed
+                        end
+                    end
+                end
+
+                if Config.AutoRespawn and humanoid.Health <= 0 then
+                    task.wait(1)
+                    pcall(function() LocalPlayer:LoadCharacter() end)
+                end
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(1)
+            if Config.Enabled and Config.ResetStreakAt > 0 then
+                local stats = LocalPlayer:FindFirstChild("leaderstats")
+                if stats then
+                    for _, value in ipairs(stats:GetChildren()) do
+                        if value:IsA("ValueBase") and value.Name:lower():find("streak", 1, true) then
+                            local amount = tonumber(value.Value)
+                            if amount and amount >= Config.ResetStreakAt then
+                                pcall(function() LocalPlayer:LoadCharacter() end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(Config.RemoteRate)
+            if Config.Enabled and Config.RemoteMode then
+                pcall(Net.Fire)
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(Config.CullRate)
+            if Config.VFXCull then
+                for _, descendant in ipairs(workspace:GetDescendants()) do
+                    if VFX_CLASSES[descendant.ClassName] and descendant.Enabled then
+                        descendant.Enabled = false
+                    end
+                end
+                Visuals.ApplyLightingCull()
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while Runtime.Running do
+            task.wait(0.5)
+            if Config.ESPChams then
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer then
+                        Visuals.SetChams(player, true)
+                    end
+                end
+            else
+                for player in pairs(ChamCache) do
+                    Visuals.SetChams(player, false)
+                end
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while Runtime.Running do
             task.wait(0.25)
-            for _, e in ipairs(btns) do
-                local on = e.get() and true or false
-                if on ~= e.on then
-                    e.on = on
-                    setBtnVisual(e.b, on)
-                end
-            end
-            if modeBtn then modeBtn.Text = "MODE: " .. (CFG.Mode == "LowestHP" and "LOW HP" or "NEAREST") end
-            if stickBtn then stickBtn.Text = "STICK: " .. CFG.StickMode .. " / " .. CFG.StickPos end
-            if ui then
-                ui.stat.Text = (CFG.Enabled and "ON" or "OFF") .. "  |  combo " .. (CFG.AutoCombo and "ON" or "OFF") ..
-                    "  |  " .. (State.target and State.target.plr.Name or "no target") ..
-                    "  |  " .. math.floor(ping()) .. "ms" .. (State.losOK and "" or "  |  LOS!")
+            if Config.Watermark and not Visuals.WatermarkGui then
+                Visuals.SetWatermark(true)
+            elseif not Config.Watermark and Visuals.WatermarkGui then
+                Visuals.SetWatermark(false)
             end
         end
     end)
+
+    RootMaid:Give(RunService.RenderStepped:Connect(function()
+        if not Runtime.Running then return end
+        pcall(Visuals.UpdateEsp)
+        pcall(Visuals.UpdateWatermark)
+        pcall(Movement.StepFly)
+    end))
+
+    RootMaid:Give(RunService.Stepped:Connect(function()
+        if not Runtime.Running then return end
+        if Config.Noclip then
+            pcall(Movement.SetNoclip, true)
+        elseif next(NoclipSaved) then
+            pcall(Movement.SetNoclip, false)
+        end
+    end))
 
     task.spawn(function()
-        while Running do
+        while Runtime.Running do
             task.wait(0.05)
-            pcall(function()
-                rs.Transparency = 0.3 + math.sin(os.clock() * 3) * 0.18
-                hgrad.Offset = Vector2.new(math.sin(os.clock() * 1.4) * 0.25, 0)
-            end)
+            if Config.Fly ~= State.Flying then
+                pcall(Movement.SetFly, Config.Fly)
+            end
         end
     end)
-end)
 
-M:give(UIS.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.RightShift and ui and ui.root then
-        if ui.root.Visible and ui.root.GroupTransparency < 0.5 then
-            if HM.setMenu then HM.setMenu(false) end
-        else
-            if HM.setMenu then HM.setMenu(true) end
+    RootMaid:Give(UserInput.JumpRequest:Connect(function()
+        if not Config.InfiniteJump then return end
+        local humanoid = Entity.Humanoid()
+        if humanoid and humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end
-    end
-end))
-
-getgenv().HOLY_MOLY_UNLOAD = function()
-    Running = false
-    M:clean()
-    for _, m in pairs(pMaid) do pcall(function() m:clean() end) end
-    destroyAlign()
-    destroyWall()
-    espOff()
-    pcall(function() if Drawing and Drawing.Clear then Drawing:Clear() end end)
-    local h = myHum()
-    if h then h.AutoRotate = true end
-    for _, n in ipairs({"HolyMolyFarm", "HolyMolySplash"}) do
-        local g = game:GetService("CoreGui"):FindFirstChild(n)
-        if g then g:Destroy() end
-    end
-    _G.HM = nil
-    _G.HM_TOAST = nil
-    getgenv().HOLY_MOLY_UNLOAD = nil
+    end))
 end
 
-splash()
+--══════════════════════════════════════════════════════════════ HOTKEYS ══
+
+local Hotkeys = {}
+
+function Hotkeys.Install()
+    RootMaid:Give(UserInput.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        local key = input.KeyCode
+
+        if key == Enum.KeyCode.F2 then
+            Config.Enabled = not Config.Enabled
+            Notify.Push("ФАРМ: " .. (Config.Enabled and "ON" or "OFF"), Config.Enabled and "success" or "warn")
+        elseif key == Enum.KeyCode.C then
+            Config.AutoCombo = not Config.AutoCombo
+            Notify.Push("AUTO COMBO: " .. (Config.AutoCombo and "ON" or "OFF"), Config.AutoCombo and "success" or "warn")
+        elseif key == Enum.KeyCode.F3 then
+            local order = {"LowestHP", "Nearest", "Farthest", "HighestHP"}
+            local index = 1
+            for i, value in ipairs(order) do
+                if value == Config.Mode then index = i end
+            end
+            Config.Mode = order[(index % #order) + 1]
+            Notify.Push("режим: " .. Config.Mode, "info")
+        elseif key == Enum.KeyCode.F4 then
+            local order = {"Physics", "Hard", "None"}
+            local index = 1
+            for i, value in ipairs(order) do
+                if value == Config.StickMode then index = i end
+            end
+            Config.StickMode = order[(index % #order) + 1]
+            Notify.Push("стик: " .. Config.StickMode, "info")
+        elseif key == Enum.KeyCode.F5 then
+            Config.SilentAim = not Config.SilentAim
+            Notify.Push("SILENT AIM: " .. (Config.SilentAim and "ON" or "OFF"), "info")
+        elseif key == Enum.KeyCode.F6 then
+            Config.VFXCull = not Config.VFXCull
+            Notify.Push("VFX CULL: " .. (Config.VFXCull and "ON" or "OFF"), "info")
+        elseif key == Enum.KeyCode.F7 then
+            Config.RemoteLog = not Config.RemoteLog
+            print("[HM] remote log: " .. tostring(Config.RemoteLog))
+        elseif key == Enum.KeyCode.F8 then
+            Config.Enabled = false
+            Notify.Push("ФАРМ: OFF", "warn")
+        elseif key == Enum.KeyCode.F9 then
+            local order = {"Behind", "Front", "Side", "Above"}
+            local index = 1
+            for i, value in ipairs(order) do
+                if value == Config.StickPos then index = i end
+            end
+            Config.StickPos = order[(index % #order) + 1]
+            Notify.Push("точка стика: " .. Config.StickPos, "info")
+        elseif key == Enum.KeyCode.F10 then
+            Config.ESP = not Config.ESP
+            Notify.Push("ESP: " .. (Config.ESP and "ON" or "OFF"), "info")
+        elseif key == Enum.KeyCode.F11 then
+            ConfigManager.Save(Config.ActiveSlot)
+            Notify.Push("конфиг сохранён", "success")
+        end
+    end))
+end
+
+--═════════════════════════════════════════════════════════════════ BOOT ══
+
+getgenv().HM_UNLOAD = function()
+    Runtime.Running = false
+
+    RootMaid:Clean()
+    for _, maid in pairs(PlayerMaids) do
+        pcall(function() maid:Clean() end)
+    end
+
+    Movement.DropAlign()
+    Movement.DropWall()
+    Visuals.EspHide()
+    Visuals.RestoreLighting()
+    Visuals.SetWatermark(false)
+
+    pcall(function()
+        if Drawing and Drawing.Clear then Drawing.Clear() end
+    end)
+    pcall(function()
+        if Drawing and Drawing.Clear then Drawing:Clear() end
+    end)
+
+    local humanoid = Entity.Humanoid()
+    if humanoid then
+        humanoid.AutoRotate = true
+    end
+
+    for _, name in ipairs({"HM_Menu", "HM_Splash", "HM_Toasts", "HM_Watermark"}) do
+        local gui = CoreGui:FindFirstChild(name)
+        if gui then
+            gui:Destroy()
+        end
+    end
+
+    ConfigManager.Save(Config.ActiveSlot)
+
+    getgenv().HM_ACTIVE = false
+    getgenv().HM_UNLOAD = nil
+
+    print("[HM] выгружен. MADE BY ZED")
+end
+
+Notify.Mount()
+Watchers.Install()
+Social.InstallAntiAFK()
+Loops.Install()
+Hotkeys.Install()
+Runtime.HookInstalled = Net.InstallHook()
+Menu.Splash()
+
 task.delay(2.6, function()
-    if HM.toast then HM.toast("MADE BY ZED", true) end
+    if Runtime.Running then
+        Notify.Push("MADE BY ZED", "success")
+    end
 end)
 
-print("[HOLY MOLY! FARM] MADE BY ZED | hook=" .. tostring(hookOK) ..
-    " | RightShift menu | C autocombo | F2 farm F3 mode F4 stickmode F5 aim F6 vfx F7 log F8 stop F9 stickpos F10 esp")
+print(string.format("[HOLY MOLY! FARM] v%s | MADE BY ZED | hook=%s | RightShift — меню",
+    Runtime.Version, tostring(Runtime.HookInstalled)))
