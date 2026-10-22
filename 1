@@ -1,0 +1,1746 @@
+print("MADE BY ZED")
+
+if getgenv().HOLY_MOLY_UNLOAD then pcall(getgenv().HOLY_MOLY_UNLOAD) end
+
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local VIM = game:GetService("VirtualInputManager")
+local TPS = game:GetService("TeleportService")
+local Stats = game:GetService("Stats")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local LP = Players.LocalPlayer
+
+local CFG = {
+    Enabled = true,
+    Mode = "LowestHP",
+    Range = 65,
+    Whitelist = {},
+    FriendsWhitelist = true,
+    SafeZoneFilter = true,
+    ImmunityFilter = true,
+
+    StickMode = "Physics",
+    StickPos = "Behind",
+    StickOffset = 4.5,
+    StickHeight = 1.5,
+    AboveHeight = 6,
+    AlignResponsiveness = 150,
+    AlignMaxForce = 100000,
+    AlignMaxVelocity = 0,
+    HardKillVelocity = true,
+    FreezeMove = true,
+    AimPart = "HumanoidRootPart",
+
+    Prediction = 1.0,
+    MaxLead = 0.22,
+    Face = true,
+    LockCam = true,
+    AutoWalk = true,
+
+    AutoCombo = true,
+    AutoM1 = true,
+    M1Delay = 0.10,
+    M1Jitter = 0.35,
+    ComboHits = 3,
+    ComboReset = 0.32,
+    ComboInfinite = false,
+    EndlagCancel = true,
+    EndlagTime = 0.07,
+
+    Reach = true,
+    ReachMin = 9,
+    ReachMax = 24,
+    ReachTime = 0.12,
+    ReachSnap = 3.2,
+
+    AutoSkill = true,
+    SkillKeys = {"E", "R", "T"},
+    SkillDelay = 1.6,
+    GuardBreakOnBlock = true,
+
+    ComboFeeder = true,
+    FeederKeys = {"E", "R", "T", "Y"},
+    FeederDelay = 0.09,
+    FeederOnRagdoll = true,
+    FeederOnStun = true,
+
+    Awaken = true,
+    AwakenKey = "G",
+    AwakenDelay = 3,
+
+    DashKey = "Q",
+    AutoDash = true,
+    DashRange = 24,
+    DodgeKey = "Q",
+    AutoDodge = true,
+    AutoTech = true,
+    TechKeys = {"A", "D", "S"},
+    BlockKey = "F",
+    AutoBlock = false,
+    AutoCounter = false,
+    CounterKey = "R",
+    CounterRange = 14,
+    CounterCooldown = 0.6,
+
+    AttackWindow = 0.5,
+    LOSCheck = true,
+
+    WallCombo = false,
+    WallDist = 2.2,
+    WallSize = 9,
+
+    HitboxScale = 1.0,
+    HitboxTime = 0.25,
+    HitboxSweep = 3,
+
+    AntiRagdoll = true,
+    AntiStun = true,
+    AntiFling = true,
+    AutoRespawn = true,
+    AnimSpeed = 1.2,
+    NoFatigue = true,
+    JumpPower = 55,
+
+    VFXCull = false,
+    CullRate = 2,
+    LightingCull = true,
+    ESP = false,
+    DrawRange = 250,
+
+    SilentAim = false,
+    RemoteLog = false,
+    RemoteMode = false,
+    RemoteName = "",
+    RemoteArg = "none",
+    RemoteRate = 0.12,
+
+    Toxic = false,
+    ToxicMsgs = {"EZ", "ez", "GGEZ", "gg", "skill issue"},
+
+    OnStaff = "Notify",
+    StaffIds = {},
+    StaffGroup = 0,
+
+    ResetStreakAt = 0,
+    WalkSpeed = 0,
+}
+
+math.randomseed(os.clock() * 100000)
+
+local State = {
+    target = nil,
+    tgtPlr = nil,
+    lastM1 = 0,
+    lastSkill = 0,
+    lastAwaken = 0,
+    lastDash = 0,
+    lastDodge = 0,
+    lastWalk = 0,
+    lastCounter = 0,
+    lastFeeder = 0,
+    lastHitTarget = nil,
+    lastHitTime = 0,
+    combo = 0,
+    skillIdx = 0,
+    feederIdx = 0,
+    blocking = false,
+    losOK = true,
+    ragdolled = false,
+    staffNotified = false,
+}
+
+local Running = true
+local idleAnims = setmetatable({}, { __mode = "k" })
+local lastTracks = setmetatable({}, { __mode = "k" })
+local attackStart = setmetatable({}, { __mode = "k" })
+local spawnClock = setmetatable({}, { __mode = "k" })
+local friendCache = setmetatable({}, { __mode = "k" })
+local pMaid = setmetatable({}, { __mode = "k" })
+local safeParts = {}
+local align = nil
+local wallPart = nil
+
+local LIMBS = {
+    Head = true, Torso = true, UpperTorso = true, LowerTorso = true, HumanoidRootPart = true,
+    LeftHand = true, RightHand = true, LeftFoot = true, RightFoot = true,
+    LeftLowerArm = true, RightLowerArm = true, LeftUpperArm = true, RightUpperArm = true,
+    LeftLowerLeg = true, RightLowerLeg = true, LeftUpperLeg = true, RightUpperLeg = true,
+}
+
+local HB_PAT = {"hitbox", "hit", "m1", "punch", "attack", "damage", "receiver", "hurt", "impact"}
+
+local Maid = {}
+Maid.__index = Maid
+function Maid.new() return setmetatable({ t = {} }, Maid) end
+function Maid:give(x) self.t[#self.t + 1] = x return x end
+function Maid:clean()
+    for i = #self.t, 1, -1 do
+        local x = self.t[i]
+        pcall(function()
+            local ty = typeof(x)
+            if ty == "RBXScriptConnection" then x:Disconnect()
+            elseif ty == "Instance" then x:Destroy()
+            elseif ty == "thread" then task.cancel(x)
+            elseif ty == "function" then x() end
+        end)
+        self.t[i] = nil
+    end
+end
+
+local M = Maid.new()
+
+local function maidFor(p)
+    local m = pMaid[p]
+    if not m then
+        m = Maid.new()
+        pMaid[p] = m
+    end
+    return m
+end
+
+local function tw(obj, time, props, style, dir)
+    local info = TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out)
+    local t = TweenService:Create(obj, info, props)
+    t:Play()
+    return t
+end
+
+local function myChar() return LP.Character end
+local function myHRP()
+    local c = LP.Character
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+local function myHum()
+    local c = LP.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function humOf(c) return c and c:FindFirstChildOfClass("Humanoid") end
+local function hrpOf(c) return c and c:FindFirstChild("HumanoidRootPart") end
+
+local function ping()
+    local ok, p = pcall(function() return LP:GetNetworkPing() end)
+    if ok and p then return p * 1000 end
+    local ok2, v = pcall(function() return Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
+    if ok2 and v then return v end
+    return 60
+end
+
+local function attrBool(inst, names)
+    for _, n in ipairs(names) do
+        local v = inst:GetAttribute(n)
+        if v ~= nil then return v == true end
+    end
+    for _, n in ipairs(names) do
+        local f = inst:FindFirstChild(n)
+        if f then
+            if f:IsA("BoolValue") then return f.Value end
+            return true
+        end
+    end
+    return false
+end
+
+local ATK_ATTR = {"Attacking", "InCombo", "IsAttacking", "UsingMove", "Dashing", "MoveActive"}
+
+local function isBlocking(char) return attrBool(char, {"Blocking", "Block", "IsBlocking", "Guarding", "Blocked"}) end
+
+local function isRagdolled(char, hum)
+    if attrBool(char, {"Ragdoll", "Ragdolled", "IsRagdoll", "Stunned", "Stun"}) then return true end
+    if hum and hum.PlatformStand then return true end
+    if hum and hum:GetState() == Enum.HumanoidStateType.Physics then return true end
+    return false
+end
+
+local function isStunned(char) return attrBool(char, {"Stunned", "Stun", "Staggered", "HitStun"}) end
+
+local function isAttacking(p, char)
+    if attrBool(char, ATK_ATTR) then return true end
+    local t0 = attackStart[p]
+    if t0 and (os.clock() - t0) <= CFG.AttackWindow then return true end
+    return false
+end
+
+local function isFriend(p)
+    local v = friendCache[p]
+    if v == nil then
+        local ok, r = pcall(function() return LP:IsFriendsWith(p.UserId) end)
+        v = ok and r or false
+        friendCache[p] = v
+    end
+    return v
+end
+
+local function isWhitelisted(p)
+    if CFG.Whitelist[p.Name] or CFG.Whitelist[p.UserId] then return true end
+    if CFG.FriendsWhitelist and isFriend(p) then return true end
+    return false
+end
+
+local function refreshSafe()
+    table.clear(safeParts)
+    for _, d in ipairs(workspace:GetChildren()) do
+        if d:IsA("BasePart") then
+            local n = d.Name:lower()
+            if n:find("safe") or n:find("spawn") or n:find("lobby") then
+                safeParts[#safeParts + 1] = d
+            end
+        end
+    end
+    local sp = workspace:FindFirstChildOfClass("SpawnLocation")
+    if sp then safeParts[#safeParts + 1] = sp end
+end
+
+local function inSafe(pos)
+    for _, p in ipairs(safeParts) do
+        local r = math.max(p.Size.Magnitude * 0.5, 38)
+        if (p.Position - pos).Magnitude <= r then return true end
+    end
+    return false
+end
+
+local function isImmune(p, hum, char)
+    if attrBool(char, {"Invulnerable", "Immune", "SpawnProtection", "IFrames", "SpawnImmunity"}) then return true end
+    local t0 = spawnClock[p]
+    if t0 and (os.clock() - t0) < 2.5 and hum.Health >= hum.MaxHealth then return true end
+    return false
+end
+
+local function snapshotIdles(p)
+    local c = p.Character
+    local h = humOf(c)
+    if not h then return end
+    local set = {}
+    for _, tr in ipairs(h:GetPlayingAnimationTracks()) do
+        if tr.Animation then set[tr.Animation.AnimationId] = true end
+    end
+    idleAnims[p] = set
+    lastTracks[p] = {}
+end
+
+local function nonIdleTracks(h, p)
+    local set = {}
+    local idle = idleAnims[p]
+    for _, tr in ipairs(h:GetPlayingAnimationTracks()) do
+        local id = tr.Animation and tr.Animation.AnimationId
+        if id and not (idle and idle[id]) then set[id] = true end
+    end
+    return set
+end
+
+local VFX_NAME = {"vfx", "effect", "hit", "slash", "impact", "smear", "aura", "spark", "flash", "wave"}
+
+local function say(msg)
+    pcall(function()
+        local tc = game:GetService("TextChatService")
+        local ch = tc and tc.TextChannels and tc.TextChannels:FindFirstChild("RBXGeneral")
+        if ch then
+            ch:SendAsync(msg)
+            return
+        end
+    end)
+    pcall(function()
+        RS.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
+    end)
+end
+
+local function watchChar(p, c)
+    if not c then return end
+    local m = maidFor(p)
+    m:give(c.ChildAdded:Connect(function(ch)
+        local n = ch.Name:lower()
+        for _, k in ipairs(VFX_NAME) do
+            if n:find(k) then
+                attackStart[p] = os.clock()
+                return
+            end
+        end
+    end))
+    local h = humOf(c)
+    if h then
+        m:give(h.Died:Connect(function()
+            if State.lastHitTarget == p and (os.clock() - State.lastHitTime) < 4 then
+                State.combo = 0
+                if CFG.Toxic then say(CFG.ToxicMsgs[math.random(#CFG.ToxicMsgs)]) end
+            end
+        end))
+    end
+end
+
+local ultFrame = nil
+local function findUlt()
+    local pg = LP:FindFirstChildOfClass("PlayerGui")
+    if not pg then return end
+    for _, d in ipairs(pg:GetDescendants()) do
+        if d:IsA("Frame") then
+            local n = d.Name:lower()
+            if n:find("awaken") or n:find("ult") or n:find("rage") or n:find("power") or n:find("energy") then
+                ultFrame = d
+                return
+            end
+        end
+    end
+end
+
+local function ultReady()
+    for _, n in ipairs({"Awakening", "Ult", "Ultimate", "Rage", "AwakenValue", "Power", "Energy"}) do
+        local v = LP:GetAttribute(n)
+        if v == nil and LP.Character then v = LP.Character:GetAttribute(n) end
+        if typeof(v) == "number" then
+            if v >= 100 or (v >= 0.99 and v <= 1.01) then return true end
+        elseif v == true then
+            return true
+        end
+    end
+    if not ultFrame or not ultFrame.Parent then ultFrame = nil findUlt() end
+    if not ultFrame then return false end
+    if ultFrame:IsA("Frame") and ultFrame.Size.X.Scale >= 0.97 then return true end
+    for _, c in ipairs(ultFrame:GetDescendants()) do
+        if c:IsA("Frame") and c.Size.X.Scale >= 0.97 then return true end
+    end
+    return false
+end
+
+local function aimPoint(t)
+    if CFG.AimPart ~= "" then
+        local p = t.char:FindFirstChild(CFG.AimPart)
+        if p and p:IsA("BasePart") then return p end
+    end
+    return t.hrp
+end
+
+local function pick()
+    local myR = myHRP()
+    if not myR then return nil end
+    local myPos = myR.Position
+    local best, bestKey
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and not isWhitelisted(p) then
+            local c = p.Character
+            if c then
+                local h = humOf(c)
+                local r = hrpOf(c)
+                if h and r and h.Health > 0 then
+                    local ok = true
+                    if CFG.SafeZoneFilter and inSafe(r.Position) then ok = false end
+                    if ok and CFG.ImmunityFilter and isImmune(p, h, c) then ok = false end
+                    if ok then
+                        local d = (r.Position - myPos).Magnitude
+                        if d <= CFG.Range then
+                            local key
+                            if CFG.Mode == "Nearest" then key = d
+                            elseif CFG.Mode == "Farthest" then key = -d
+                            else key = h.Health end
+                            if not bestKey or key < bestKey then
+                                bestKey = key
+                                best = { plr = p, char = c, hum = h, hrp = r, dist = d }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+local losParams
+local function hasLOS(t)
+    local myR = myHRP()
+    if not myR then return true end
+    if not losParams then
+        losParams = RaycastParams.new()
+        losParams.FilterType = Enum.RaycastFilterType.Exclude
+        losParams.IgnoreWater = true
+    end
+    losParams.FilterDescendantsInstances = { LP.Character, t.char, wallPart }
+    local hit = workspace:Raycast(myR.Position, t.hrp.Position - myR.Position, losParams)
+    return hit == nil
+end
+
+local function leadTime()
+    if CFG.Prediction <= 0 then return 0 end
+    return math.clamp(ping() / 1000, 0.02, CFG.MaxLead) * CFG.Prediction
+end
+
+local function predictPos(r)
+    return r.Position + r.AssemblyLinearVelocity * leadTime()
+end
+
+local hasM1 = (type(mouse1click) == "function")
+
+local function click()
+    if hasM1 then
+        pcall(mouse1click)
+    else
+        pcall(function() VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1) end)
+        task.delay(0.03, function()
+            pcall(function() VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1) end)
+        end)
+    end
+end
+
+local function keyDown(k)
+    local kc = Enum.KeyCode[tostring(k):upper()]
+    if kc then pcall(function() VIM:SendKeyEvent(true, kc, false, game) end) end
+end
+
+local function keyUp(k)
+    local kc = Enum.KeyCode[tostring(k):upper()]
+    if kc then pcall(function() VIM:SendKeyEvent(false, kc, false, game) end) end
+end
+
+local function key(k, hold)
+    hold = hold or 0.05
+    keyDown(k)
+    task.delay(hold, function() keyUp(k) end)
+end
+
+local function dashDir(dir)
+    if dir then keyDown(dir) end
+    key(CFG.DashKey)
+    if dir then task.delay(0.12, function() keyUp(dir) end) end
+end
+
+local function destroyAlign()
+    if not align then return end
+    pcall(function() align.ap:Destroy() end)
+    pcall(function() align.ao:Destroy() end)
+    pcall(function() align.att:Destroy() end)
+    align = nil
+end
+
+local function ensureAlign()
+    local r = myHRP()
+    if not r then return end
+    if align and align.hrp == r and align.att.Parent then return end
+    destroyAlign()
+    local att = Instance.new("Attachment")
+    att.Name = "HolyMolyAtt"
+    att.Parent = r
+    local ap = Instance.new("AlignPosition")
+    ap.Mode = Enum.PositionAlignmentMode.OneAttachment
+    ap.Attachment0 = att
+    ap.ApplyAtCenterOfMass = true
+    ap.RigidityEnabled = false
+    ap.MaxForce = CFG.AlignMaxForce
+    ap.Responsiveness = CFG.AlignResponsiveness
+    if CFG.AlignMaxVelocity > 0 then ap.MaxVelocity = CFG.AlignMaxVelocity end
+    ap.Parent = r
+    local ao = Instance.new("AlignOrientation")
+    ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    ao.Attachment0 = att
+    ao.RigidityEnabled = false
+    ao.MaxTorque = CFG.AlignMaxForce
+    ao.Responsiveness = CFG.AlignResponsiveness
+    ao.Parent = r
+    align = { hrp = r, att = att, ap = ap, ao = ao }
+end
+
+local function stickGoal(t)
+    local ap = aimPoint(t)
+    local tp = predictPos(ap)
+    local pos
+    if CFG.StickPos == "Behind" then
+        pos = tp - ap.CFrame.LookVector * CFG.StickOffset + Vector3.new(0, CFG.StickHeight, 0)
+    elseif CFG.StickPos == "Front" then
+        pos = tp + ap.CFrame.LookVector * CFG.StickOffset + Vector3.new(0, CFG.StickHeight, 0)
+    else
+        pos = tp + Vector3.new(0, CFG.AboveHeight, 0)
+    end
+    return pos, tp
+end
+
+local function applyStick(t)
+    local myR = myHRP()
+    if not myR then return end
+    local h = myHum()
+
+    if h and CFG.FreezeMove and CFG.StickMode == "Physics" then
+        pcall(function() h:Move(Vector3.zero, false) end)
+    end
+    if h then h.AutoRotate = false end
+
+    if CFG.StickMode == "None" then
+        destroyAlign()
+        if CFG.Face then
+            local flat = t.hrp.Position - myR.Position
+            flat = Vector3.new(flat.X, 0, flat.Z)
+            if flat.Magnitude > 0.4 then
+                myR.CFrame = CFrame.lookAt(myR.Position, myR.Position + flat)
+            end
+        end
+        return
+    end
+
+    local pos, tp = stickGoal(t)
+
+    if CFG.StickMode == "Physics" then
+        ensureAlign()
+        if align then
+            align.ap.Position = pos
+            align.ao.CFrame = CFrame.lookAt(myR.Position, tp)
+        end
+    else
+        destroyAlign()
+        myR.CFrame = CFrame.lookAt(pos, tp)
+        if CFG.HardKillVelocity then myR.AssemblyLinearVelocity = Vector3.zero end
+    end
+end
+
+local function applyReach(t)
+    local myR = myHRP()
+    if not myR then return end
+    local d = t.dist
+    if d < CFG.ReachMin or d > CFG.ReachMax then return end
+    if CFG.StickMode == "Physics" and align then
+        align.ap.MaxVelocity = math.huge
+        align.ap.Responsiveness = 400
+        task.delay(CFG.ReachTime, function()
+            if align and align.ap.Parent then
+                align.ap.MaxVelocity = (CFG.AlignMaxVelocity > 0) and CFG.AlignMaxVelocity or math.huge
+                align.ap.Responsiveness = CFG.AlignResponsiveness
+            end
+        end)
+    else
+        local ap = aimPoint(t)
+        local dir = ap.Position - myR.Position
+        dir = Vector3.new(dir.X, 0, dir.Z)
+        if dir.Magnitude < 0.5 then return end
+        local pos = ap.Position - dir.Unit * CFG.ReachSnap + Vector3.new(0, 1.5, 0)
+        myR.CFrame = CFrame.lookAt(pos, ap.Position)
+    end
+end
+
+local function endlagCancel()
+    if not CFG.EndlagCancel then return end
+    task.delay(CFG.EndlagTime, function()
+        local h = myHum()
+        if not h or h.PlatformStand then return end
+        local st = h:GetState()
+        if st == Enum.HumanoidStateType.Running
+            or st == Enum.HumanoidStateType.Freefall
+            or st == Enum.HumanoidStateType.Landed then
+            pcall(function() h:ChangeState(Enum.HumanoidStateType.Running) end)
+        end
+    end)
+end
+
+local function destroyWall()
+    if wallPart then
+        pcall(function() wallPart:Destroy() end)
+        wallPart = nil
+    end
+end
+
+local function ensureWall()
+    if wallPart and wallPart.Parent then return wallPart end
+    wallPart = Instance.new("Part")
+    wallPart.Name = "HolyMolyWall"
+    wallPart.Anchored = true
+    wallPart.CanCollide = false
+    wallPart.CanQuery = true
+    wallPart.CanTouch = true
+    wallPart.Massless = true
+    wallPart.CastShadow = false
+    wallPart.Material = Enum.Material.SmoothPlastic
+    wallPart.Transparency = 1
+    wallPart.Size = Vector3.new(CFG.WallSize, CFG.WallSize, 1)
+    wallPart.Parent = workspace
+    return wallPart
+end
+
+local function updateWall(t)
+    if not CFG.WallCombo or CFG.StickMode == "None" then
+        destroyWall()
+        return
+    end
+    local myR = myHRP()
+    if not myR then return end
+    local dir = t.hrp.Position - myR.Position
+    dir = Vector3.new(dir.X, 0, dir.Z)
+    if dir.Magnitude < 0.5 then return end
+    local w = ensureWall()
+    w.Size = Vector3.new(CFG.WallSize, CFG.WallSize, 1)
+    w.CFrame = CFrame.lookAt(t.hrp.Position + dir.Unit * CFG.WallDist, myR.Position)
+end
+
+local function isHitboxName(n)
+    n = n:lower()
+    for _, k in ipairs(HB_PAT) do
+        if n:find(k) then return true end
+    end
+    return false
+end
+
+local function expandHitbox(d)
+    if CFG.HitboxScale == 1 then return end
+    if not d:IsA("BasePart") then return end
+    if LIMBS[d.Name] then return end
+    if not isHitboxName(d.Name) then return end
+    local base = d:GetAttribute("HolyHBBase")
+    if not base or (base * CFG.HitboxScale - d.Size).Magnitude > 0.35 then
+        base = d.Size
+        pcall(function() d:SetAttribute("HolyHBBase", base) end)
+    end
+    d.Size = base * CFG.HitboxScale
+end
+
+local function armHitbox(d)
+    expandHitbox(d)
+    task.spawn(function()
+        local t0 = os.clock()
+        while os.clock() - t0 < CFG.HitboxTime do
+            task.wait(0.03)
+            if not d.Parent then break end
+            expandHitbox(d)
+        end
+    end)
+end
+
+local function animSpeed()
+    local h = myHum()
+    if not h then return end
+    local idle = idleAnims[LP]
+    for _, tr in ipairs(h:GetPlayingAnimationTracks()) do
+        local id = tr.Animation and tr.Animation.AnimationId
+        if id and not (idle and idle[id]) then
+            if tr.Speed ~= CFG.AnimSpeed then tr.Speed = CFG.AnimSpeed end
+        end
+    end
+end
+
+local function combatM1(t)
+    local now = os.clock()
+    if now - State.lastM1 > CFG.ComboReset then State.combo = 0 end
+    if not CFG.ComboInfinite and State.combo >= CFG.ComboHits then return end
+    local jit = 1 + (math.random() - 0.5) * CFG.M1Jitter
+    if now - State.lastM1 >= CFG.M1Delay * jit then
+        State.lastM1 = now
+        State.combo = State.combo + 1
+        if CFG.Reach then pcall(applyReach, t) end
+        click()
+        State.lastHitTarget = t.plr
+        State.lastHitTime = now
+        endlagCancel()
+    end
+end
+
+local function feeder(t)
+    if not CFG.ComboFeeder then return end
+    local now = os.clock()
+    if now - State.lastFeeder < CFG.FeederDelay then return end
+    local rag = isRagdolled(t.char, t.hum)
+    local stun = isStunned(t.char)
+    if (rag and CFG.FeederOnRagdoll) or (stun and CFG.FeederOnStun) then
+        State.feederIdx = (State.feederIdx % #CFG.FeederKeys) + 1
+        State.lastFeeder = now
+        key(CFG.FeederKeys[State.feederIdx])
+    end
+end
+
+local function brain(t)
+    local now = os.clock()
+    if t.plr ~= State.tgtPlr then
+        State.tgtPlr = t.plr
+        State.combo = 0
+    end
+
+    if CFG.AutoWalk and CFG.StickMode == "None" and t.dist > 12 and now - State.lastWalk > 0.25 then
+        State.lastWalk = now
+        local h = myHum()
+        if h then pcall(function() h:MoveTo(t.hrp.Position) end) end
+    end
+
+    if not CFG.AutoCombo then return end
+
+    local blocking = isBlocking(t.char)
+    local rag = isRagdolled(t.char, t.hum)
+    local atk = isAttacking(t.plr, t.char)
+
+    if CFG.AutoDash and not rag and t.dist > CFG.DashRange and now - State.lastDash > 0.6 then
+        State.lastDash = now
+        if CFG.AutoTech and CFG.StickMode ~= "None" then
+            dashDir(CFG.TechKeys[math.random(#CFG.TechKeys)])
+        else
+            key(CFG.DashKey)
+        end
+    end
+
+    if CFG.AutoDodge and t.dist < 20 and not rag and atk and now - State.lastDodge > 0.4 then
+        State.lastDodge = now
+        if CFG.AutoTech then
+            dashDir(CFG.TechKeys[math.random(#CFG.TechKeys)])
+        else
+            key(CFG.DodgeKey)
+        end
+    end
+
+    if CFG.AutoCounter and t.dist < CFG.CounterRange and atk and now - State.lastCounter > CFG.CounterCooldown then
+        State.lastCounter = now
+        key(CFG.CounterKey)
+    end
+
+    if CFG.AutoBlock and t.dist < 16 and atk and not State.blocking then
+        State.blocking = true
+        local kc = Enum.KeyCode[CFG.BlockKey:upper()]
+        if kc then
+            pcall(function() VIM:SendKeyEvent(true, kc, false, game) end)
+            task.delay(0.35, function()
+                pcall(function() VIM:SendKeyEvent(false, kc, false, game) end)
+                State.blocking = false
+            end)
+        else
+            State.blocking = false
+        end
+    end
+
+    if CFG.ComboFeeder then
+        feeder(t)
+    elseif CFG.AutoSkill and now - State.lastSkill > CFG.SkillDelay then
+        if (not blocking) or CFG.GuardBreakOnBlock then
+            State.skillIdx = (State.skillIdx % #CFG.SkillKeys) + 1
+            State.lastSkill = now
+            key(CFG.SkillKeys[State.skillIdx])
+        end
+    end
+
+    if CFG.Awaken and now - State.lastAwaken > CFG.AwakenDelay and ultReady() then
+        State.lastAwaken = now
+        key(CFG.AwakenKey)
+    end
+
+    if CFG.AutoM1 and (State.losOK or not CFG.LOSCheck) then
+        combatM1(t)
+    end
+end
+
+local remoteCache = nil
+local function findRemote()
+    if remoteCache and remoteCache.Parent then return remoteCache end
+    remoteCache = nil
+    if CFG.RemoteName == "" then return nil end
+    for _, d in ipairs(RS:GetDescendants()) do
+        if (d:IsA("RemoteEvent") or d:IsA("UnreliableRemoteEvent")) and d.Name == CFG.RemoteName then
+            remoteCache = d
+            return d
+        end
+    end
+    return nil
+end
+
+local function fireRemote()
+    local r = findRemote()
+    local t = State.target
+    if not r or not t then return end
+    if CFG.RemoteArg == "player" then
+        pcall(function() r:FireServer(t.plr) end)
+    elseif CFG.RemoteArg == "char" then
+        pcall(function() r:FireServer(t.char) end)
+    elseif CFG.RemoteArg == "hrp" then
+        pcall(function() r:FireServer(t.hrp) end)
+    elseif CFG.RemoteArg == "pos" then
+        pcall(function() r:FireServer(t.hrp.Position) end)
+    else
+        pcall(function() r:FireServer() end)
+    end
+end
+
+local origNamecall
+local hookOK = pcall(function()
+    local mt = getrawmetatable(game)
+    origNamecall = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = function(self, ...)
+        local m = getnamecallmethod()
+        if m == "FireServer" or m == "InvokeServer" then
+            if CFG.RemoteLog and typeof(self) == "Instance" then
+                print("[HOLY MOLY] " .. m .. " -> " .. self:GetFullName(), ...)
+            end
+        elseif m == "Raycast" and CFG.SilentAim and self == workspace and State.target then
+            local a1, a2, a3 = ...
+            if typeof(a1) == "Vector3" then
+                local myR = myHRP()
+                if myR and (a1 - myR.Position).Magnitude < 20 then
+                    return origNamecall(self, a1, aimPoint(State.target).Position - a1, a3)
+                end
+            end
+        end
+        return origNamecall(self, ...)
+    end
+    setreadonly(mt, true)
+end)
+
+local function watch(p)
+    spawnClock[p] = 0
+    friendCache[p] = nil
+    p:GetPropertyChangedSignal("Character"):Connect(function() end)
+    M:give(p.CharacterAdded:Connect(function(c)
+        spawnClock[p] = os.clock()
+        maidFor(p):clean()
+        watchChar(p, c)
+        task.delay(2, function()
+            if Running then snapshotIdles(p) end
+        end)
+    end))
+    if p.Character then watchChar(p, p.Character) end
+    task.spawn(function()
+        task.wait(2)
+        snapshotIdles(p)
+    end)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do watch(p) end
+
+M:give(Players.PlayerAdded:Connect(function(p)
+    watch(p)
+    task.wait(3)
+    if not Running then return end
+    local staff = CFG.StaffIds[p.UserId] or CFG.StaffIds[p.Name]
+    if not staff and CFG.StaffGroup > 0 then
+        local ok, rank = pcall(function() return p:GetRankInGroup(CFG.StaffGroup) end)
+        if ok and rank and rank >= 1 then staff = true end
+    end
+    if staff then
+        State.staffNotified = true
+        if CFG.OnStaff == "Shutdown" then
+            pcall(function() game:Shutdown() end)
+        elseif CFG.OnStaff == "Hop" then
+            pcall(function() TPS:Teleport(game.PlaceId, LP) end)
+        else
+            print("[HOLY MOLY] STAFF DETECTED: " .. p.Name)
+        end
+    else
+        task.wait(4)
+        if Running and not p.Character and not State.staffNotified then
+            print("[HOLY MOLY] possible spectator: " .. p.Name)
+        end
+    end
+end))
+
+M:give(Players.PlayerRemoving:Connect(function(p)
+    friendCache[p] = nil
+    idleAnims[p] = nil
+    lastTracks[p] = nil
+    attackStart[p] = nil
+    spawnClock[p] = nil
+    if pMaid[p] then
+        pMaid[p]:clean()
+        pMaid[p] = nil
+    end
+end))
+
+M:give(LP.CharacterAdded:Connect(function(c)
+    spawnClock[LP] = os.clock()
+    destroyAlign()
+    watchChar(LP, c)
+    task.wait(0.6)
+    local h = humOf(c)
+    if h then h.AutoRotate = true end
+    task.wait(1.4)
+    snapshotIdles(LP)
+end))
+
+local VFX = {
+    ParticleEmitter = true,
+    Trail = true,
+    Beam = true,
+    Fire = true,
+    Smoke = true,
+    Sparkles = true,
+}
+
+local LIGHT_EFFECTS = {
+    BlurEffect = true,
+    BloomEffect = true,
+    SunRaysEffect = true,
+    DepthOfFieldEffect = true,
+}
+
+local function applyLightingCull()
+    if not CFG.LightingCull then return end
+    for _, d in ipairs(Lighting:GetChildren()) do
+        if LIGHT_EFFECTS[d.ClassName] and d.Enabled then d.Enabled = false end
+    end
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 500
+end
+
+refreshSafe()
+task.spawn(function()
+    while Running do
+        task.wait(3)
+        refreshSafe()
+    end
+end)
+
+M:give(workspace.DescendantAdded:Connect(function(d)
+    if d:IsA("BasePart") and CFG.HitboxScale ~= 1 and isHitboxName(d.Name) then
+        pcall(armHitbox, d)
+    end
+    if CFG.VFXCull then
+        if VFX[d.ClassName] then d.Enabled = false end
+        if d:IsA("Explosion") then d.Visible = false end
+    end
+end))
+
+task.spawn(function()
+    while Running do
+        task.wait(CFG.HitboxSweep)
+        if CFG.HitboxScale ~= 1 then
+            for _, d in ipairs(workspace:GetChildren()) do
+                if d:IsA("BasePart") then pcall(expandHitbox, d) end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while Running do
+        task.wait(0.03)
+        local myR = myHRP()
+        if myR then
+            local myPos = myR.Position
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP then
+                    local c = p.Character
+                    local h = humOf(c)
+                    local r = hrpOf(c)
+                    if h and r and (r.Position - myPos).Magnitude <= CFG.Range * 1.5 then
+                        local set = nonIdleTracks(h, p)
+                        local prev = lastTracks[p] or {}
+                        local currentSet = {}
+                        for id in pairs(set) do
+                            currentSet[id] = true
+                            if not prev[id] then
+                                attackStart[p] = os.clock()
+                            end
+                        end
+                        lastTracks[p] = currentSet
+                    end
+                end
+            end
+        end
+    end
+end)
+
+M:give(RunService.Heartbeat:Connect(function()
+    if not Running then return end
+    if not CFG.Enabled then
+        destroyAlign()
+        destroyWall()
+        return
+    end
+
+    local myC = myChar()
+    local myH = myHum()
+    local rag = (myC and myH and isRagdolled(myC, myH)) and true or false
+    State.ragdolled = rag
+
+    if align then
+        align.ap.Enabled = not rag
+        align.ao.Enabled = not rag
+    end
+
+    local t = State.target
+    if not t or not t.hrp.Parent then
+        destroyAlign()
+        destroyWall()
+        return
+    end
+
+    if not rag then pcall(applyStick, t) end
+    pcall(updateWall, t)
+
+    if CFG.LockCam and not rag then
+        local cam = workspace.CurrentCamera
+        if cam then
+            cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(cam.CFrame.Position, predictPos(aimPoint(t))), 0.5)
+        end
+    end
+end))
+
+task.spawn(function()
+    while Running do
+        task.wait(0.07)
+        if CFG.Enabled then
+            local t = pick()
+            State.target = t
+            State.losOK = (not t) or (not CFG.LOSCheck) or hasLOS(t)
+        else
+            State.target = nil
+            State.losOK = true
+        end
+    end
+end)
+
+task.spawn(function()
+    while Running do
+        task.wait(0.02)
+        if CFG.Enabled then
+            local t = State.target
+            if t and t.hrp.Parent and t.hum.Health > 0 then
+                pcall(brain, t)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while Running do
+        task.wait(0.1)
+        local h = myHum()
+        local c = myChar()
+        if h and c then
+            if CFG.AntiRagdoll and h.PlatformStand then
+                pcall(function() h.PlatformStand = false end)
+            end
+            if CFG.AntiStun then
+                local st = h:GetState()
+                if st == Enum.HumanoidStateType.Physics or st == Enum.HumanoidStateType.FallingDown then
+                    pcall(function() h:ChangeState(Enum.HumanoidStateType.Running) end)
+                end
+                if h.WalkSpeed < 8 and not h.PlatformStand then h.WalkSpeed = 16 end
+            end
+            if CFG.NoFatigue then
+                h.UseJumpPower = true
+                if h.JumpPower < CFG.JumpPower then h.JumpPower = CFG.JumpPower end
+            end
+            if CFG.AntiFling then
+                local r = hrpOf(c)
+                if r and r.AssemblyLinearVelocity.Magnitude > 250 then
+                    r.AssemblyLinearVelocity = r.AssemblyLinearVelocity * 0.15
+                end
+            end
+            if CFG.WalkSpeed > 0 then h.WalkSpeed = CFG.WalkSpeed end
+            if CFG.AnimSpeed ~= 1 then animSpeed() end
+            if CFG.AutoRespawn and h.Health <= 0 then
+                task.wait(1)
+                pcall(function() LP:LoadCharacter() end)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while Running do
+        task.wait(1)
+        if CFG.Enabled and CFG.ResetStreakAt > 0 then
+            local ls = LP:FindFirstChild("leaderstats")
+            if ls then
+                for _, v in ipairs(ls:GetChildren()) do
+                    if v:IsA("ValueBase") and v.Name:lower():find("streak") then
+                        local n = tonumber(v.Value)
+                        if n and n >= CFG.ResetStreakAt then
+                            pcall(function() LP:LoadCharacter() end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while Running do
+        task.wait(CFG.RemoteRate)
+        if CFG.Enabled and CFG.RemoteMode then
+            pcall(fireRemote)
+        end
+    end
+end)
+
+task.spawn(function()
+    while Running do
+        task.wait(CFG.CullRate)
+        if CFG.VFXCull then
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if VFX[d.ClassName] and d.Enabled then d.Enabled = false end
+            end
+            applyLightingCull()
+        end
+    end
+end)
+
+local DRAW = { pool = {}, circle = nil, active = false }
+
+local function espOff()
+    if not DRAW.active then return end
+    for _, e in ipairs(DRAW.pool) do
+        e.line.Visible = false
+        e.text.Visible = false
+    end
+    if DRAW.circle then DRAW.circle.Visible = false end
+    DRAW.active = false
+end
+
+local function updateESP()
+    if not (CFG.ESP and Drawing and Drawing.new) then
+        espOff()
+        return
+    end
+    local cam = workspace.CurrentCamera
+    local myR = myHRP()
+    if not cam or not myR then return end
+    DRAW.active = true
+    local vp = cam.ViewportSize
+    local i = 0
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then
+            local c = p.Character
+            local r = hrpOf(c)
+            local h = humOf(c)
+            if r and h and h.Health > 0 then
+                local d = (r.Position - myR.Position).Magnitude
+                if d <= CFG.DrawRange then
+                    local sp, on = cam:WorldToViewportPoint(r.Position)
+                    if on then
+                        i = i + 1
+                        local e = DRAW.pool[i]
+                        if not e then
+                            local ok = pcall(function()
+                                local l = Drawing.new("Line")
+                                l.Thickness = 1.4
+                                local t = Drawing.new("Text")
+                                t.Size = 13
+                                t.Center = true
+                                t.Outline = true
+                                t.Font = 2
+                                DRAW.pool[i] = { line = l, text = t }
+                            end)
+                            if ok then e = DRAW.pool[i] end
+                        end
+                        if e then
+                            e.line.From = Vector2.new(vp.X / 2, vp.Y)
+                            e.line.To = Vector2.new(sp.X, sp.Y)
+                            e.line.Color = Color3.fromRGB(255, 105, 200)
+                            e.line.Visible = true
+                            e.text.Position = Vector2.new(sp.X, sp.Y - 20)
+                            e.text.Text = string.format("%s | %d | %dm", p.Name, math.floor(h.Health), math.floor(d))
+                            e.text.Color = Color3.fromRGB(255, 235, 250)
+                            e.text.Visible = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    for j = i + 1, #DRAW.pool do
+        DRAW.pool[j].line.Visible = false
+        DRAW.pool[j].text.Visible = false
+    end
+    if not DRAW.circle then
+        pcall(function()
+            local c0 = Drawing.new("Circle")
+            c0.Thickness = 1.5
+            c0.NumSides = 48
+            c0.Color = Color3.fromRGB(120, 220, 255)
+            DRAW.circle = c0
+        end)
+    end
+    if DRAW.circle then
+        local a = cam:WorldToViewportPoint(myR.Position)
+        local b = cam:WorldToViewportPoint(myR.Position + Vector3.new(CFG.Range, 0, 0))
+        DRAW.circle.Position = Vector2.new(a.X, a.Y)
+        DRAW.circle.Radius = math.abs(b.X - a.X)
+        DRAW.circle.Visible = true
+    end
+end
+
+M:give(RunService.RenderStepped:Connect(function()
+    if not Running then return end
+    pcall(updateESP)
+end))
+
+M:give(UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    local k = input.KeyCode
+    if k == Enum.KeyCode.F2 then
+        CFG.Enabled = not CFG.Enabled
+    elseif k == Enum.KeyCode.C then
+        CFG.AutoCombo = not CFG.AutoCombo
+        if _G.HM_TOAST then _G.HM_TOAST("AUTO COMBO: " .. (CFG.AutoCombo and "ON" or "OFF"), CFG.AutoCombo) end
+    elseif k == Enum.KeyCode.F3 then
+        CFG.Mode = (CFG.Mode == "LowestHP") and "Nearest" or "LowestHP"
+    elseif k == Enum.KeyCode.F4 then
+        local order = { "Physics", "Hard", "None" }
+        local i = 1
+        for n, v in ipairs(order) do if v == CFG.StickMode then i = n end end
+        CFG.StickMode = order[(i % #order) + 1]
+    elseif k == Enum.KeyCode.F5 then
+        CFG.SilentAim = not CFG.SilentAim
+    elseif k == Enum.KeyCode.F6 then
+        CFG.VFXCull = not CFG.VFXCull
+    elseif k == Enum.KeyCode.F7 then
+        CFG.RemoteLog = not CFG.RemoteLog
+        print("[HOLY MOLY] remote log: " .. tostring(CFG.RemoteLog))
+    elseif k == Enum.KeyCode.F8 then
+        CFG.Enabled = false
+    elseif k == Enum.KeyCode.F9 then
+        local order = { "Behind", "Above", "Front" }
+        local i = 1
+        for n, v in ipairs(order) do if v == CFG.StickPos then i = n end end
+        CFG.StickPos = order[(i % #order) + 1]
+    elseif k == Enum.KeyCode.F10 then
+        CFG.ESP = not CFG.ESP
+    end
+end))
+
+local HM = {}
+_G.HM = HM
+
+local splash = function()
+    local ok = pcall(function()
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "HolyMolySplash"
+        sg.IgnoreGuiInset = true
+        sg.DisplayOrder = 999
+        sg.ResetOnSpawn = false
+        sg.Parent = game:GetService("CoreGui")
+
+        local holder = Instance.new("Frame")
+        holder.AnchorPoint = Vector2.new(0.5, 0.5)
+        holder.Position = UDim2.fromScale(0.5, 0.42)
+        holder.Size = UDim2.fromOffset(460, 120)
+        holder.BackgroundTransparency = 1
+        holder.Parent = sg
+
+        local sc = Instance.new("UIScale")
+        sc.Scale = 0.78
+        sc.Parent = holder
+
+        local title = Instance.new("TextLabel")
+        title.AnchorPoint = Vector2.new(0.5, 0.5)
+        title.Position = UDim2.new(0.5, 0, 0, 26)
+        title.Size = UDim2.new(1, 0, 0, 46)
+        title.BackgroundTransparency = 1
+        title.Font = Enum.Font.GothamBlack
+        title.TextSize = 40
+        title.TextTransparency = 1
+        title.TextColor3 = Color3.fromRGB(255, 105, 200)
+        title.Text = "HOLY MOLY! FARM"
+        title.Parent = holder
+
+        local line = Instance.new("Frame")
+        line.AnchorPoint = Vector2.new(0.5, 0.5)
+        line.Position = UDim2.new(0.5, 0, 0, 58)
+        line.Size = UDim2.new(0.45, 0, 0, 1)
+        line.BackgroundColor3 = Color3.fromRGB(255, 105, 200)
+        line.BackgroundTransparency = 1
+        line.BorderSizePixel = 0
+        line.Parent = holder
+
+        local by = Instance.new("TextLabel")
+        by.AnchorPoint = Vector2.new(0.5, 0.5)
+        by.Position = UDim2.new(0.5, 0, 0, 78)
+        by.Size = UDim2.new(1, 0, 0, 22)
+        by.BackgroundTransparency = 1
+        by.Font = Enum.Font.GothamBold
+        by.TextSize = 18
+        by.TextTransparency = 1
+        by.TextColor3 = Color3.fromRGB(240, 240, 250)
+        by.Text = "MADE BY ZED"
+        by.Parent = holder
+
+        tw(sc, 0.55, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        tw(title, 0.4, { TextTransparency = 0 })
+        task.delay(0.12, function() tw(line, 0.35, { BackgroundTransparency = 0.35 }) end)
+        task.delay(0.18, function() tw(by, 0.4, { TextTransparency = 0 }) end)
+
+        task.delay(2.1, function()
+            tw(sc, 0.45, { Scale = 1.18 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            tw(title, 0.45, { TextTransparency = 1 })
+            tw(by, 0.45, { TextTransparency = 1 })
+            tw(line, 0.45, { BackgroundTransparency = 1 })
+            task.delay(0.55, function() pcall(function() sg:Destroy() end) end)
+        end)
+    end)
+    return ok
+end
+
+local ui = nil
+pcall(function()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "HolyMolyFarm"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 50
+    gui.Parent = game:GetService("CoreGui")
+
+    local root = Instance.new("CanvasGroup")
+    root.Name = "Root"
+    root.AnchorPoint = Vector2.new(0, 0)
+    root.Size = UDim2.fromOffset(238, 420)
+    root.Position = UDim2.new(0, 20, 0.13, 0)
+    root.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
+    root.BackgroundTransparency = 0.05
+    root.GroupTransparency = 1
+    root.BorderSizePixel = 0
+    root.Active = true
+    root.Draggable = true
+    root.Visible = false
+    root.Parent = gui
+
+    local rc = Instance.new("UICorner")
+    rc.CornerRadius = UDim.new(0, 12)
+    rc.Parent = root
+
+    local rs = Instance.new("UIStroke")
+    rs.Color = Color3.fromRGB(255, 92, 190)
+    rs.Thickness = 1.4
+    rs.Transparency = 0.3
+    rs.Parent = root
+
+    local head = Instance.new("TextLabel")
+    head.Size = UDim2.new(1, -52, 0, 24)
+    head.Position = UDim2.new(0, 10, 0, 8)
+    head.BackgroundTransparency = 1
+    head.Font = Enum.Font.GothamBlack
+    head.TextSize = 16
+    head.TextXAlignment = Enum.TextXAlignment.Left
+    head.TextColor3 = Color3.fromRGB(255, 108, 200)
+    head.Text = "HOLY MOLY! FARM"
+    head.Parent = root
+
+    local hgrad = Instance.new("UIGradient")
+    hgrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 195)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 240, 252)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 195)),
+    })
+    hgrad.Parent = head
+
+    local sub = Instance.new("TextLabel")
+    sub.Size = UDim2.new(1, -20, 0, 14)
+    sub.Position = UDim2.new(0, 10, 0, 31)
+    sub.BackgroundTransparency = 1
+    sub.Font = Enum.Font.GothamBold
+    sub.TextSize = 11
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+    sub.TextColor3 = Color3.fromRGB(255, 200, 235)
+    sub.Text = "MADE BY ZED"
+    sub.Parent = root
+
+    local stat = Instance.new("TextLabel")
+    stat.Size = UDim2.new(1, -20, 0, 14)
+    stat.Position = UDim2.new(0, 10, 0, 47)
+    stat.BackgroundTransparency = 1
+    stat.Font = Enum.Font.Gotham
+    stat.TextSize = 11
+    stat.TextXAlignment = Enum.TextXAlignment.Left
+    stat.TextColor3 = Color3.fromRGB(190, 190, 205)
+    stat.Text = "idle"
+    stat.Parent = root
+
+    local min = Instance.new("TextButton")
+    min.AnchorPoint = Vector2.new(1, 0)
+    min.Size = UDim2.fromOffset(22, 22)
+    min.Position = UDim2.new(1, -10, 0, 9)
+    min.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    min.BorderSizePixel = 0
+    min.Font = Enum.Font.GothamBold
+    min.TextSize = 14
+    min.TextColor3 = Color3.fromRGB(220, 220, 235)
+    min.Text = "–"
+    min.Parent = root
+    local mc = Instance.new("UICorner")
+    mc.CornerRadius = UDim.new(0, 6)
+    mc.Parent = min
+
+    local list = Instance.new("Frame")
+    list.Size = UDim2.new(1, -20, 1, -122)
+    list.Position = UDim2.new(0, 10, 0, 66)
+    list.BackgroundTransparency = 1
+    list.Parent = root
+
+    local grid = Instance.new("UIGridLayout")
+    grid.CellSize = UDim2.new(0.5, -3, 0, 22)
+    grid.CellPadding = UDim2.new(0, 6, 0, 5)
+    grid.SortOrder = Enum.SortOrder.LayoutOrder
+    grid.Parent = list
+
+    local foot = Instance.new("TextLabel")
+    foot.AnchorPoint = Vector2.new(0, 1)
+    foot.Size = UDim2.new(1, -20, 0, 16)
+    foot.Position = UDim2.new(0, 10, 1, -8)
+    foot.BackgroundTransparency = 1
+    foot.Font = Enum.Font.Gotham
+    foot.TextSize = 10
+    foot.TextXAlignment = Enum.TextXAlignment.Left
+    foot.TextColor3 = Color3.fromRGB(130, 130, 148)
+    foot.Text = "baba chai  ·  melstroy  ·  RightShift = menu"
+    foot.Parent = root
+
+    local ON_BG = Color3.fromRGB(152, 44, 112)
+    local OFF_BG = Color3.fromRGB(31, 31, 39)
+    local HOV_BG = Color3.fromRGB(55, 40, 62)
+    local ON_TXT = Color3.fromRGB(255, 236, 250)
+    local OFF_TXT = Color3.fromRGB(175, 175, 190)
+
+    local btns = {}
+
+    local function setBtnVisual(b, on)
+        tw(b, 0.18, {
+            BackgroundColor3 = on and ON_BG or OFF_BG,
+            TextColor3 = on and ON_TXT or OFF_TXT,
+        })
+    end
+
+    local function bounce(b)
+        local s = b:FindFirstChildOfClass("UIScale")
+        if not s then
+            s = Instance.new("UIScale")
+            s.Parent = b
+        end
+        s.Scale = 0.9
+        tw(s, 0.2, { Scale = 1 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    end
+
+    local function add(text, get, set)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.fromOffset(100, 22)
+        b.BackgroundColor3 = OFF_BG
+        b.BackgroundTransparency = 1
+        b.TextTransparency = 1
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 10
+        b.TextColor3 = OFF_TXT
+        b.Text = text
+        b.Parent = list
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 6)
+        c.Parent = b
+
+        local rec = { b = b, get = get, on = false, label = text }
+        btns[#btns + 1] = rec
+
+        b.MouseEnter:Connect(function()
+            if not rec.on then tw(b, 0.12, { BackgroundColor3 = HOV_BG }) end
+        end)
+        b.MouseLeave:Connect(function()
+            if not rec.on then tw(b, 0.12, { BackgroundColor3 = OFF_BG }) end
+        end)
+        b.MouseButton1Click:Connect(function()
+            local v = not get()
+            set(v)
+            rec.on = v
+            setBtnVisual(b, v)
+            bounce(b)
+            if HM.toast then HM.toast(rec.label .. ": " .. (v and "ON" or "OFF"), v) end
+        end)
+        return b
+    end
+
+    add("FARM", function() return CFG.Enabled end, function(v) CFG.Enabled = v end)
+    add("AUTO COMBO [C]", function() return CFG.AutoCombo end, function(v) CFG.AutoCombo = v end)
+    add("AUTO M1", function() return CFG.AutoM1 end, function(v) CFG.AutoM1 = v end)
+    add("REACH", function() return CFG.Reach end, function(v) CFG.Reach = v end)
+    add("ENDLAG CANCEL", function() return CFG.EndlagCancel end, function(v) CFG.EndlagCancel = v end)
+    add("FEEDER", function() return CFG.ComboFeeder end, function(v) CFG.ComboFeeder = v end)
+    add("SKILLS", function() return CFG.AutoSkill end, function(v) CFG.AutoSkill = v end)
+    add("COUNTER", function() return CFG.AutoCounter end, function(v) CFG.AutoCounter = v end)
+    add("DODGE", function() return CFG.AutoDodge end, function(v) CFG.AutoDodge = v end)
+    add("BLOCK", function() return CFG.AutoBlock end, function(v) CFG.AutoBlock = v end)
+    add("AWAKEN", function() return CFG.Awaken end, function(v) CFG.Awaken = v end)
+    add("WALL COMBO", function() return CFG.WallCombo end, function(v) CFG.WallCombo = v end)
+    add("HITBOX x2", function() return CFG.HitboxScale ~= 1 end, function(v) CFG.HitboxScale = v and 2.0 or 1.0 end)
+    add("SILENT AIM", function() return CFG.SilentAim end, function(v) CFG.SilentAim = v end)
+    add("LOS CHECK", function() return CFG.LOSCheck end, function(v) CFG.LOSCheck = v end)
+    add("ESP", function() return CFG.ESP end, function(v) CFG.ESP = v end)
+    add("VFX CULL", function() return CFG.VFXCull end, function(v) CFG.VFXCull = v end)
+    add("TOXIC", function() return CFG.Toxic end, function(v) CFG.Toxic = v end)
+    add("REMOTE LOG", function() return CFG.RemoteLog end, function(v) CFG.RemoteLog = v end)
+    add("ANTI STUN", function() return CFG.AntiStun end, function(v) CFG.AntiStun = v end)
+    local modeBtn = add("MODE", function() return CFG.Mode == "LowestHP" end, function(v) CFG.Mode = v and "LowestHP" or "Nearest" end)
+    local stickBtn = add("STICK", function() return CFG.StickMode ~= "None" end, function(v) CFG.StickMode = v and "Physics" or "None" end)
+
+    local toastHolder = Instance.new("Frame")
+    toastHolder.AnchorPoint = Vector2.new(1, 0)
+    toastHolder.Position = UDim2.new(1, -18, 0, 110)
+    toastHolder.Size = UDim2.fromOffset(210, 400)
+    toastHolder.BackgroundTransparency = 1
+    toastHolder.Parent = gui
+
+    local tl = Instance.new("UIListLayout")
+    tl.Padding = UDim.new(0, 6)
+    tl.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    tl.SortOrder = Enum.SortOrder.LayoutOrder
+    tl.Parent = toastHolder
+
+    local toasts = {}
+
+    function HM.toast(text, on)
+        local f = Instance.new("Frame")
+        f.Size = UDim2.fromOffset(0, 28)
+        f.BackgroundColor3 = on and Color3.fromRGB(60, 18, 44) or Color3.fromRGB(26, 26, 33)
+        f.BackgroundTransparency = 0.1
+        f.BorderSizePixel = 0
+        f.Parent = toastHolder
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 8)
+        c.Parent = f
+        local s = Instance.new("UIStroke")
+        s.Color = on and Color3.fromRGB(255, 105, 200) or Color3.fromRGB(90, 90, 105)
+        s.Thickness = 1
+        s.Transparency = 0.5
+        s.Parent = f
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -16, 1, 0)
+        lbl.Position = UDim2.new(0, 8, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 11
+        lbl.TextXAlignment = Enum.TextXAlignment.Right
+        lbl.TextTransparency = 1
+        lbl.TextColor3 = on and Color3.fromRGB(255, 220, 245) or Color3.fromRGB(200, 200, 215)
+        lbl.Text = text
+        lbl.Parent = f
+
+        tw(f, 0.25, { Size = UDim2.fromOffset(210, 28) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        tw(lbl, 0.25, { TextTransparency = 0 })
+        toasts[#toasts + 1] = f
+
+        task.delay(1.7, function()
+            tw(f, 0.28, { Size = UDim2.fromOffset(0, 28), BackgroundTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            tw(lbl, 0.24, { TextTransparency = 1 })
+            task.delay(0.32, function() pcall(function() f:Destroy() end) end)
+        end)
+    end
+
+    local tab = Instance.new("TextButton")
+    tab.AnchorPoint = Vector2.new(0.5, 0.5)
+    tab.Size = UDim2.fromOffset(40, 40)
+    tab.Position = UDim2.new(0, 42, 0.13, 0)
+    tab.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
+    tab.BackgroundTransparency = 0.05
+    tab.BorderSizePixel = 0
+    tab.Font = Enum.Font.GothamBlack
+    tab.TextSize = 17
+    tab.TextColor3 = Color3.fromRGB(255, 105, 200)
+    tab.Text = "H"
+    tab.Visible = false
+    tab.Parent = gui
+    local tc = Instance.new("UICorner")
+    tc.CornerRadius = UDim.new(1, 0)
+    tc.Parent = tab
+    local ts = Instance.new("UIStroke")
+    ts.Color = Color3.fromRGB(255, 92, 190)
+    ts.Thickness = 1.2
+    ts.Transparency = 0.4
+    ts.Parent = tab
+
+    local MenuOpen = true
+    local HOME = UDim2.new(0, 20, 0.13, 0)
+
+    local function setMenu(open)
+        MenuOpen = open
+        if open then
+            root.Visible = true
+            tab.Visible = false
+            tw(root, 0.38, { GroupTransparency = 0, Position = HOME }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        else
+            tw(root, 0.24, { GroupTransparency = 1, Position = UDim2.new(0, -60, 0.13, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            task.delay(0.28, function()
+                if not MenuOpen then root.Visible = false end
+            end)
+            task.delay(0.16, function()
+                if not MenuOpen then
+                    tab.Visible = true
+                    tab.Size = UDim2.fromOffset(28, 28)
+                    tw(tab, 0.25, { Size = UDim2.fromOffset(40, 40) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                end
+            end)
+        end
+    end
+
+    tab.MouseButton1Click:Connect(function()
+        tab.Visible = false
+        setMenu(true)
+    end)
+    min.MouseButton1Click:Connect(function() setMenu(false) end)
+
+    root.Position = UDim2.new(0, -60, 0.13, 0)
+
+    ui = { stat = stat, root = root, tab = tab }
+
+    task.spawn(function()
+        task.wait(0.15)
+        root.Visible = true
+        tw(root, 0.5, { GroupTransparency = 0, Position = HOME }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        for _, e in ipairs(btns) do
+            tw(e.b, 0.24, { BackgroundTransparency = 0, TextTransparency = 0 }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            task.wait(0.017)
+        end
+    end)
+
+    task.spawn(function()
+        while Running do
+            task.wait(0.25)
+            for _, e in ipairs(btns) do
+                local on = e.get() and true or false
+                if on ~= e.on then
+                    e.on = on
+                    setBtnVisual(e.b, on)
+                end
+            end
+            if modeBtn then modeBtn.Text = "MODE: " .. (CFG.Mode == "LowestHP" and "LOW HP" or "NEAREST") end
+            if stickBtn then stickBtn.Text = "STICK: " .. CFG.StickMode .. " / " .. CFG.StickPos end
+            if ui then
+                ui.stat.Text = (CFG.Enabled and "ON" or "OFF") .. "  |  combo " .. (CFG.AutoCombo and "ON" or "OFF") ..
+                    "  |  " .. (State.target and State.target.plr.Name or "no target") ..
+                    "  |  " .. math.floor(ping()) .. "ms" .. (State.losOK and "" or "  |  LOS!")
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while Running do
+            task.wait(0.05)
+            pcall(function()
+                rs.Transparency = 0.3 + math.sin(os.clock() * 3) * 0.18
+                hgrad.Offset = Vector2.new(math.sin(os.clock() * 1.4) * 0.25, 0)
+            end)
+        end
+    end)
+end)
+
+M:give(UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.RightShift and ui and ui.root then
+        if ui.root.Visible and ui.root.GroupTransparency < 0.5 then
+            if HM.setMenu then HM.setMenu(false) end
+        else
+            if HM.setMenu then HM.setMenu(true) end
+        end
+    end
+end))
+
+getgenv().HOLY_MOLY_UNLOAD = function()
+    Running = false
+    M:clean()
+    for _, m in pairs(pMaid) do pcall(function() m:clean() end) end
+    destroyAlign()
+    destroyWall()
+    espOff()
+    pcall(function() if Drawing and Drawing.Clear then Drawing:Clear() end end)
+    local h = myHum()
+    if h then h.AutoRotate = true end
+    for _, n in ipairs({"HolyMolyFarm", "HolyMolySplash"}) do
+        local g = game:GetService("CoreGui"):FindFirstChild(n)
+        if g then g:Destroy() end
+    end
+    _G.HM = nil
+    _G.HM_TOAST = nil
+    getgenv().HOLY_MOLY_UNLOAD = nil
+end
+
+splash()
+task.delay(2.6, function()
+    if HM.toast then HM.toast("MADE BY ZED", true) end
+end)
+
+print("[HOLY MOLY! FARM] MADE BY ZED | hook=" .. tostring(hookOK) ..
+    " | RightShift menu | C autocombo | F2 farm F3 mode F4 stickmode F5 aim F6 vfx F7 log F8 stop F9 stickpos F10 esp")
